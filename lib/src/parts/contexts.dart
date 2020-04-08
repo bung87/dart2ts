@@ -1,4 +1,5 @@
-part of '../code_generator.dart';
+import  '../code_generator.dart';
+import 'package:analyzer/analyzer.dart';
 
 abstract class Context<T extends TSNode> {
   TypeManager get typeManager;

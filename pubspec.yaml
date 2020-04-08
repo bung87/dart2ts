@@ -5,6 +5,7 @@ description: A better interface for TS
 version: 0.9.15
 dependencies:
   build: ">=0.11.2"
+  build_modules:
   build_runner: ">=0.6.1"
   analyzer:
   args: any

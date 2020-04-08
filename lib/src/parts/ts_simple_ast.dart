@@ -1,4 +1,4 @@
-part of '../code_generator.dart';
+import  '../code_generator.dart';
 
 /**
  * TS Generator
@@ -977,7 +977,7 @@ class TSFunction extends TSExpression implements TSStatement {
 
     if (body != null) {
       printer.writeln(' {');
-      printer.indented((IndentingPrinter printer) {
+      printer.indented(( printer) {
         //printer.writeln('/* init */');
 
         // Init all values
@@ -1146,7 +1146,7 @@ class TSList extends TSExpression {
     printer.write('[');
     if (indent) {
       printer.writeln();
-      printer.indented((IndentingPrinter p) => p.join(_elements, newLine: true));
+      printer.indented(( p) => p.join(_elements, newLine: true));
     } else {
       printer.join(_elements);
     }
@@ -1185,7 +1185,7 @@ class TSFile extends TSNode {
 
   @override
   void writeCode(IndentingPrinter printer) {
-    printer.writeln('/** from ${_cu.element.source.fullName} */');
+    printer.writeln('/** from ${_cu.declaredElement.source.fullName} */');
     _declarations.forEach((n) {
       printer.accept(n);
       if (n is TSStatement && n.needsSeparator) {
@@ -1427,7 +1427,7 @@ class TSEnumDeclaration extends TSStatement {
   @override
   void writeCode(IndentingPrinter printer) {
     printer.writeln("export enum ${name} {");
-    printer.indented((IndentingPrinter p) {
+    printer.indented(( p) {
       p.joinConsumers(constants.map((c) => (pw) => pw.write(c)), newLine: true);
     });
     printer.writeln();
@@ -1454,7 +1454,7 @@ class TSTryStatement extends TSStatement {
     if (_catches != null && _catches.isNotEmpty) {
       printer.writeln(' catch (__error__) {');
 
-      printer.indented((IndentingPrinter p) => p.join(_catches, delim: '', newLine: true));
+      printer.indented(( p) => p.join(_catches, delim: '', newLine: true));
       printer.write('}');
     }
 

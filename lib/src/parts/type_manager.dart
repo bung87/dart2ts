@@ -1,4 +1,6 @@
-part of '../code_generator.dart';
+import 'package:analyzer/dart/element/element.dart';
+
+import  '../code_generator.dart';
 
 //const String SDK_LIBRARY = '@dart2ts/dart';
 const String MODULE_PROPERTIES = 'properties';

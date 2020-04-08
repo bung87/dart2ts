@@ -1,32 +1,31 @@
 import 'dart:async';
 
-import 'package:analyzer/analyzer.dart';
-import 'package:analyzer/dart/ast/token.dart';
-import 'package:analyzer/dart/constant/value.dart';
+import 'package:build_runner_core/build_runner_core.dart';
+// import 'package:analyzer/dart/ast/token.dart';
+// import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
-import 'package:analyzer/dart/element/type.dart';
-import 'package:analyzer/src/dart/element/element.dart';
-import 'package:analyzer/src/dart/element/member.dart';
-import 'package:analyzer/src/generated/constant.dart';
-import 'package:analyzer/src/generated/resolver.dart';
+// import 'package:analyzer/dart/element/type.dart';
+// import 'package:analyzer/src/dart/element/element.dart';
+// import 'package:analyzer/src/dart/element/member.dart';
+// import 'package:analyzer/src/generated/constant.dart';
+// import 'package:analyzer/src/generated/resolver.dart';
 import 'package:args/command_runner.dart';
 import 'package:build/build.dart';
-import 'package:build_runner/build_runner.dart';
 import 'package:dart2ts/src/utils.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as _P;
-import 'package:resource/resource.dart' as res;
+// import 'package:resource/resource.dart' as res;
 import 'package:source_gen/source_gen.dart';
 import 'package:yaml/yaml.dart';
 import 'dart:io' as io;
 
-part 'package:dart2ts/src/parts/contexts.dart';
+import 'package:dart2ts/src/parts/contexts.dart';
 
-part 'package:dart2ts/src/parts/ts_simple_ast.dart';
+// import 'package:dart2ts/src/parts/ts_simple_ast.dart';
 
-part 'parts/type_manager.dart';
+// import 'parts/type_manager.dart';
 
-part 'parts/overrides.dart';
+import 'parts/overrides.dart';
 
 final _P.Context path = new _P.Context(style: _P.Style.posix, current: '/');
 

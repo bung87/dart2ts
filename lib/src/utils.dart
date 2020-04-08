@@ -1,7 +1,7 @@
 import 'dart:async';
+import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'dart:io';
-import 'package:analyzer/analyzer.dart';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/src/generated/engine.dart';
@@ -162,7 +162,7 @@ Map<X, List<AnnotationInfo>> firstLevelAnnotationMap<X>(
         key: (AnnotationInfo o) => _whichMatcher(o.annotation, matchers, orElse),
         value: (AnnotationInfo o) => o);
 
-Element _element(AstNode x) => (x is Declaration) ? x.element : ((x is Directive) ? x.element : null);
+Element _element(AstNode x) => (x is Declaration) ? x.declaredElement : ((x is Directive) ? x.element : null);
 
 bool hasAnyFirstLevelAnnotation(Iterable<CompilationUnit> cus, bool matches(DartObject x)) =>
     allFirstLevelAnnotation(cus, matches).isNotEmpty;
@@ -218,9 +218,9 @@ PropertyInducingElement findField(Element clazz, String name) {
 
   if (clazz is ClassElement) {
     return clazz.fields.firstWhere((fe) => fe.name == name,
-        orElse: () => flattenWith(flattenWith(clazz.interfaces ?? <InterfaceType>[], (InterfaceType x) => x.accessors),
-                    (PropertyAccessorElement ac) => [ac.variable])
-                .firstWhere((PropertyInducingElement ac) => ac.name == name, orElse: () {
+        orElse: () => flattenWith(flattenWith(clazz.interfaces ?? <InterfaceType>[], ( x) => x.accessors),
+                    ( ac) => [ac.variable])
+                .firstWhere(( ac) => ac.name == name, orElse: () {
               if (clazz.supertype != clazz) {
                 return findField(clazz.supertype?.element, name);
               }
@@ -241,10 +241,10 @@ String tsMethodName(String name) {
 bool isAnonymousConstructor(ConstructorElement c) => (c.name ?? "").isEmpty && !c.isFactory;
 
 DartType getType(AnalysisContext ctx, String libraryUri, String typeName) =>
-    getLibrary(ctx, libraryUri).getType(typeName).type;
+    getLibrary(ctx, libraryUri).getType(typeName).thisType;
 
 LibraryElement getLibrary(AnalysisContext ctx, String libraryUri) =>
-    ctx.computeLibraryElement(ctx.sourceFactory.forUri(libraryUri));
+    ctx.sourceFactory.forUri(libraryUri);
 
 LibraryElement dartCore(AnalysisContext ctx) => getLibrary(ctx, 'dart:core');
 

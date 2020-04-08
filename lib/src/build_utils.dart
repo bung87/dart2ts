@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:build_runner/build_runner.dart' as builder;
-
+import 'package:build_runner_core/build_runner_core.dart';
 import 'package:dart2ts/src/code_generator.dart';
 
 import 'package:path/path.dart' as p;
@@ -32,22 +31,22 @@ tsc({String basePath: '.'}) async {
 enum Mode { APPLICATION, LIBRARY }
 
 class BuildException {
-  builder.BuildResult _result;
+  BuildResult _result;
 
   BuildException(this._result);
 
-  builder.BuildResult get result => _result;
+  BuildResult get result => _result;
 
   toString() => "Build Exception ${_result.exception}";
 }
 
-Future<builder.BuildResult> tsbuild({String basePath: '.', bool clean: true, Mode mode: Mode.LIBRARY}) async {
+Future<BuildResult> tsbuild({String basePath: '.', bool clean: true, Mode mode: Mode.LIBRARY}) async {
   if (clean) {
     Directory dir = new Directory(path.join(basePath, '.dart_tool'));
     if (dir.existsSync()) dir.deleteSync(recursive: true);
   }
 
-  builder.PackageGraph packageGraph = new builder.PackageGraph.forPath(basePath);
+  PackageGraph packageGraph = new PackageGraph.forPath(basePath);
 
   Config cfg;
 
@@ -60,11 +59,11 @@ Future<builder.BuildResult> tsbuild({String basePath: '.', bool clean: true, Mod
       break;
   }
 
-  builder.BuildResult res = await builder.build([
-    new builder.BuildAction(new Dart2TsBuilder(cfg), packageGraph.root.name, inputs: ['lib/**.dart']),
+  BuildResult res = await build([
+    new BuildAction(new Dart2TsBuilder(cfg), packageGraph.root.name, inputs: ['lib/**.dart']),
   ], deleteFilesByDefault: true, packageGraph: packageGraph);
 
-  if (res.status != builder.BuildStatus.success) {
+  if (res.status != BuildStatus.success) {
     throw new BuildException(res);
   }
 
@@ -92,7 +91,7 @@ Future fixDependencyPath(String dist, String packageName) async {
       lines.map((l) {
         Match m = re.matchAsPrefix(l);
         if (m != null && (!path.isAbsolute(m[2]) && !m[2].startsWith('.'))) {
-          String origPath = m[2];
+          // String origPath = m[2];
           String virtualAbsolutePath =
               path.joinAll(["node_modules", packageName]..addAll(path.split(path.relative(f.path, from: dist))));
           String virtualRelativePath = path.relative(m[2], from: virtualAbsolutePath);
@@ -126,7 +125,7 @@ Future copyAssets(String dist, {String basePath: '.'}) async {
 
 Future finishLibrary({String basePath: '.', String packageName}) async {
   File tsconfigFile = new File(path.join(basePath, 'tsconfig.json'));
-  var tsconfig = JSON.decode(tsconfigFile.readAsStringSync());
+  var tsconfig = jsonDecode(tsconfigFile.readAsStringSync());
   String dist = path.joinAll([basePath, tsconfig['compilerOptions']['outDir'], 'lib']);
   await fixDependencyPath(dist, packageName);
   await copyAssets(dist);

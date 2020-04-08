@@ -1,11 +1,8 @@
-import 'dart:async';
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:args/command_runner.dart';
-import 'package:build/src/builder/build_step.dart';
-import 'package:build_runner/build_runner.dart';
 import 'package:logging/logging.dart';
-import 'package:package_config/packages_file.dart' as packages;
 import 'package:path/path.dart' as path;
 import 'package:yaml/yaml.dart';
 
@@ -31,14 +28,6 @@ class Pubspec {
   String get author => content['author'] ?? 'unknown';
 
   toString() => "Package ${name} ${version} [${depth}]";
-}
-
-class Dart2TsPackageBuildAction extends PackageBuilder {
-  @override
-  Future build(BuildStep buildStep) {}
-
-  @override
-  Iterable<String> get outputs => ['dart2ts.gen.dart'];
 }
 
 class Dart2TsInstallCommand extends Command<bool> {
@@ -84,7 +73,7 @@ void _installAllDeps(String rootPath, String destPath) {
     Pubspec pubspec = new Pubspec(packagePath: fromPath, content: content, depth: depth);
     if (!deps.containsKey(pubspec.name)) {
       deps[pubspec.name] = pubspec;
-      (pubspec.dependencies ?? {}).keys.forEach((String k) {
+      (pubspec.dependencies ?? {}).keys.forEach(( k) {
         pubspec.children.add(collectDeps(path.dirname(pkgs[k].toFilePath()), depth + 1));
       });
     }
@@ -137,7 +126,7 @@ void _generatePackageJson(Pubspec pubspec, String pkgRoot, String filePath) {
   File f = new File(filePath);
   if (!f.existsSync()) {
     // Create a new file
-    f.writeAsStringSync(JSON.encode({
+    f.writeAsStringSync(jsonEncode({
       "name": pubspec.name,
       "version": pubspec.version,
       "description": pubspec.description,
@@ -162,7 +151,7 @@ void _generateTsConfig(Pubspec pubspec, String pkgRoot, String filePath) {
   File f = new File(filePath);
   if (!f.existsSync()) {
     // Create a new file
-    f.writeAsStringSync(JSON.encode({
+    f.writeAsStringSync(jsonEncode({
       "compilerOptions": {
         "module": "es6",
         "target": "es6",

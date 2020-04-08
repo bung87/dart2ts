@@ -1,4 +1,4 @@
-part of '../code_generator.dart';
+import  '../code_generator.dart';
 
 abstract class IOverrides {
   IOverrides();
