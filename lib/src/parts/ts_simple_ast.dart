@@ -1,4 +1,9 @@
+import 'package:analyzer/dart/ast/ast.dart';
+import 'package:dart2ts/src/utils.dart';
+
 import  '../code_generator.dart';
+import './type_manager.dart';
+import './contexts.dart';
 
 /**
  * TS Generator

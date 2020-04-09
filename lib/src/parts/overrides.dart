@@ -1,4 +1,8 @@
-import  '../code_generator.dart';
+import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/type.dart';
+import 'package:yaml/yaml.dart';
+import  './ts_simple_ast.dart';
 
 abstract class IOverrides {
   IOverrides();

@@ -1,7 +1,14 @@
+import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
-
+import 'package:analyzer/dart/element/type.dart';
+import 'package:build/build.dart';
+import 'package:dart2ts/src/code_generator.dart';
+import 'package:dart2ts/src/parts/contexts.dart';
+import 'package:dart2ts/src/utils.dart';
 import  '../code_generator.dart';
-
+import  './ts_simple_ast.dart';
+import  './overrides.dart';
 //const String SDK_LIBRARY = '@dart2ts/dart';
 const String MODULE_PROPERTIES = 'properties';
 
@@ -226,14 +233,14 @@ class TypeManager {
         return p;
       });
 
-  static Set<DartType> nativeTypes() => ((TypeProvider x) => new Set<DartType>.from([
+  static Set<DartType> nativeTypes() => (( x) => new Set<DartType>.from([
         x.boolType,
         x.stringType,
         x.intType,
         x.numType,
         x.doubleType,
         x.functionType,
-      ]))(currentContext.typeProvider);
+      ]))(currentContext.runtimeType);
 
   static Set<String> nativeClasses = new Set.from(['List', 'Map', 'Iterable', 'Iterator']);
 

@@ -1,31 +1,23 @@
 import 'dart:async';
 
 import 'package:build_runner_core/build_runner_core.dart';
-// import 'package:analyzer/dart/ast/token.dart';
-// import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
-// import 'package:analyzer/dart/element/type.dart';
-// import 'package:analyzer/src/dart/element/element.dart';
-// import 'package:analyzer/src/dart/element/member.dart';
-// import 'package:analyzer/src/generated/constant.dart';
-// import 'package:analyzer/src/generated/resolver.dart';
 import 'package:args/command_runner.dart';
 import 'package:build/build.dart';
 import 'package:dart2ts/src/utils.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as _P;
-// import 'package:resource/resource.dart' as res;
 import 'package:source_gen/source_gen.dart';
 import 'package:yaml/yaml.dart';
 import 'dart:io' as io;
-
+import 'package:build_runner_core/src/package_graph/package_graph.dart';
 import 'package:dart2ts/src/parts/contexts.dart';
-
-// import 'package:dart2ts/src/parts/ts_simple_ast.dart';
-
-// import 'parts/type_manager.dart';
-
+import 'package:build_runner/src/watcher/graph_watcher.dart';
+import 'package:build/src/builder/build_step_impl.dart';
+import 'package:build/src/builder/build_step.dart';
 import 'parts/overrides.dart';
+import 'package:build_resolvers/build_resolvers.dart';
+
 
 final _P.Context path = new _P.Context(style: _P.Style.posix, current: '/');
 
@@ -54,7 +46,7 @@ class Dart2TsBuildCommand extends Command<bool> {
 
   @override
   run() {
-    PackageGraph graph = new PackageGraph.forPath(argResults['dir']);
+    PackageGraph graph = new PackageGraph.fromRoot(argResults['dir']);
 
     Overrides overrides;
     if (argResults['with-overrides'] != null) {
@@ -64,44 +56,54 @@ class Dart2TsBuildCommand extends Command<bool> {
       overrides = null;
     }
 
-    List<BuildAction> actions = [
-      new BuildAction(
-          new Dart2TsBuilder(new Config(
+    // List<BuildAction> actions = [
+      // new BuildAction(
+    var builder = new Dart2TsBuilder(new Config(
               modulePrefix: argResults['module-prefix'],
               moduleSuffix: argResults['module-suffix'],
               overrides: overrides,
-              sdkPrefix: argResults['sdk-prefix'])),
-          graph.root.name,
-          inputs: ['lib/**.dart', 'web/**.dart'])
-    ];
+              sdkPrefix: argResults['sdk-prefix']));
+          // graph.root.name,
+          // inputs: ['lib/**.dart', 'web/**.dart']
+          // )
+    // ];
 
     if (argResults['watch'] == true) {
-      watch(actions, packageGraph: graph, onLog: (_) {}, deleteFilesByDefault: true);
+      final watcher = PackageGraphWatcher(graph);
+      watcher.watch(); //actions, packageGraph: graph, onLog: (_) {}, deleteFilesByDefault: true
     } else {
-      build(actions, packageGraph: graph, onLog: (_) {}, deleteFilesByDefault: true);
+      var resourceManager = ResourceManager();
+      // var reader = StubAssetReader();
+      var reader =  new FileBasedAssetReader(graph);
+      var writer = new FileBasedAssetWriter(graph);
+      var primary = AssetId(graph.root.name,graph.root.path);
+      var buildStep = BuildStepImpl(primary, [], reader, writer, primary.package,
+          AnalyzerResolvers(), resourceManager);
+      // build(actions, packageGraph: graph, onLog: (_) {}, deleteFilesByDefault: true);
+      builder.build(buildStep);
     }
   }
 }
 
-Future<BuildResult> dart2tsBuild(String path, Config config) {
-  PackageGraph graph = new PackageGraph.forPath(path);
+// Future<BuildResult> dart2tsBuild(String path, Config config) {
+//   PackageGraph graph = new PackageGraph.fromRoot( new PackageNode(path));
 
-  List<BuildAction> actions = [
-    new BuildAction(new Dart2TsBuilder(config), graph.root.name, inputs: ['lib/**.dart', 'web/**.dart'])
-  ];
+//   List<BuildAction> actions = [
+//     new BuildAction(new Dart2TsBuilder(config), graph.root.name, inputs: ['lib/**.dart', 'web/**.dart'])
+//   ];
 
-  return build(actions, packageGraph: graph, onLog: (_) {}, deleteFilesByDefault: true);
-}
+//   return build(actions, packageGraph: graph, onLog: (_) {}, deleteFilesByDefault: true);
+// }
 
-Future<ServeHandler> dart2tsWatch(String path, Config config) {
-  PackageGraph graph = new PackageGraph.forPath(path);
+// Future<ServeHandler> dart2tsWatch(String path, Config config) {
+//   PackageGraph graph = new PackageGraph.fromRoot(new PackageNode(path));
 
-  List<BuildAction> actions = [
-    new BuildAction(new Dart2TsBuilder(config), graph.root.name, inputs: ['lib/**.dart', 'web/**.dart'])
-  ];
+//   List<BuildAction> actions = [
+//     new BuildAction(new Dart2TsBuilder(config), graph.root.name, inputs: ['lib/**.dart', 'web/**.dart'])
+//   ];
 
-  return watch(actions, packageGraph: graph, onLog: (_) {}, deleteFilesByDefault: true);
-}
+//   return watch(actions, packageGraph: graph, onLog: (_) {}, deleteFilesByDefault: true);
+// }
 
 Builder dart2TsBuilder([Config config]) {
   return new Dart2TsBuilder(config ?? new Config());

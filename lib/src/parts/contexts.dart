@@ -1,5 +1,14 @@
-import  '../code_generator.dart';
-import 'package:analyzer/analyzer.dart';
+
+import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/token.dart';
+import 'package:analyzer/dart/ast/visitor.dart';
+import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/type.dart';
+import 'package:dart2ts/src/utils.dart';
+
+import './type_manager.dart';
+import  './ts_simple_ast.dart';
+import  './overrides.dart';
 
 abstract class Context<T extends TSNode> {
   TypeManager get typeManager;
