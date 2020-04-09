@@ -49,7 +49,9 @@ class Overrides extends IOverrides {
 
     return new Overrides(loadYamlDocument(str),resolver);
   }
-
+  Future<LibraryElement> getLibrary(String name) async {
+    return this._resolver.findLibraryByName(name);
+  }
   Future<String> resolvePrefix(TypeManager m, String module, [String origPrefix = null]) async {
     if (module == 'global') {
       return "";

@@ -711,13 +711,7 @@ class TSFunction extends TSExpression implements TSStatement {
     FormalParameterCollector withParameterCollector,
     this.declared: false,
   }) {
-    if (isGenerator) {
-      if (isAsync) {
-        prefix = tm.namespace(getLibrary(currentContext, 'dart:async'));
-      } else {
-        prefix = tm.namespace(getLibrary(currentContext, 'dart:core'));
-      }
-    }
+    asignPrefix();
     if (withParameterCollector != null) {
       parameters = new List.from(withParameterCollector.tsParameters);
       namedParameters = withParameterCollector.namedType?.fields;
@@ -730,6 +724,15 @@ class TSFunction extends TSExpression implements TSStatement {
               new TSDotExpression(new TSSimpleExpression('this'), f), new TSSimpleExpression(f), "="))));
     }
   }
+
+  asignPrefix() async { 
+    if (isGenerator) {
+      if (isAsync) {
+        prefix = tm.namespace( await this.tm.getLibrary('dart:async'));
+      } else {
+        prefix = tm.namespace(await this.tm.getLibrary( 'dart:core'));
+      }
+    }}
 
   @override
   void writeCode(IndentingPrinter printer) {
@@ -748,7 +751,7 @@ class TSFunction extends TSExpression implements TSStatement {
     }
   }
 
-  void _writeCodeNoInterpolator(IndentingPrinter printer) {
+  void _writeCodeNoInterpolator(IndentingPrinter printer) async {
     annotations.forEach((anno) {
       printer.accept(anno);
       printer.writeln();
@@ -882,7 +885,7 @@ class TSFunction extends TSExpression implements TSStatement {
       }
 
       if (isAsync && !isGenerator) {
-        String async = tm.namespace(getLibrary(currentContext, 'dart:async'));
+        String async = tm.namespace( await this.tm.getLibrary( 'dart:async'));
         writePrehamble(false);
         printer.write(' => new ${async}.Future.fromPromise(( async ');
       }
@@ -947,7 +950,7 @@ class TSFunction extends TSExpression implements TSStatement {
       printer.write(' => ');
     } else {
       if (isAsync) {
-        String async = tm.namespace(getLibrary(currentContext, 'dart:async'));
+        String async = tm.namespace(await this.tm.getLibrary( 'dart:async'));
         if (isGenerator) {
           printer.writeln(' { ');
           printer.indent();
