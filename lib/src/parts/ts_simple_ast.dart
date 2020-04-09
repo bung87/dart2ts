@@ -1,4 +1,5 @@
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:dart2ts/src/utils.dart';
 
 import  '../code_generator.dart';
@@ -1049,7 +1050,7 @@ class TSFunction extends TSExpression implements TSStatement {
       }
     } else {
       if (isAsync) {
-        String async = tm.namespace(getLibrary(currentContext, 'dart:async'));
+        // String async = tm.namespace(getLibrary(currentContext, 'dart:async'));
         if (isGenerator) {
           printer.writeln(';');
           printer.deindent();
@@ -1183,14 +1184,14 @@ class TSReturnStatement extends TSStatement {
 }
 
 class TSFile extends TSNode {
-  CompilationUnit _cu;
+  CompilationUnitElement _cu;
   Iterable<TSNode> _declarations;
 
   TSFile(this._cu, this._declarations);
 
   @override
   void writeCode(IndentingPrinter printer) {
-    printer.writeln('/** from ${_cu.declaredElement.source.fullName} */');
+    printer.writeln('/** from ${_cu.source.fullName} */');
     _declarations.forEach((n) {
       printer.accept(n);
       if (n is TSStatement && n.needsSeparator) {

@@ -5,16 +5,24 @@ import 'dart:io';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/src/generated/engine.dart';
-
+import 'dart:mirrors';
 bool isListType(DartType type) => isTypeInstanceOf(type?.element?.context?.typeProvider?.listType, type);
 
 bool isIterableType(DartType type) => isTypeInstanceOf(type?.element?.context?.typeProvider?.iterableType, type);
+
+Iterable<DartType> getSubTypes(DartType type) {
+  final element = type.element;
+  if (element is ClassElement) {
+    return element.allSupertypes;
+  }
+  return const [];
+}
 
 bool isTypeInstanceOf(ParameterizedType base, DartType type) =>
     type != null &&
     (type is ParameterizedType) &&
     type.typeArguments.length == 1 &&
-    type.isSubtypeOf(base.element as ClassElement).instantiate([type.typeArguments.single]);
+    List.from(getSubTypes(type)).any( (x)=> x == (base.element as ClassElement).instantiate(typeArguments:[type.typeArguments.single], nullabilitySuffix: null) );
 
 final Uri _DART2TS_URI = Uri.parse('package:dart2ts/annotations.dart');
 final Uri _DART2TS_ASSET_URI = Uri.parse('asset:dart2ts/lib/annotations.dart');

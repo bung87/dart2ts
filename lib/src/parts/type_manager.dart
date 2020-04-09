@@ -102,7 +102,7 @@ class TypeManager {
   TSExpression checkMethod(DartType type, String methodName, TSExpression tsTarget, {TSExpression orElse()}) =>
       _overrides.checkMethod(this, type, methodName, tsTarget, orElse: orElse);
 
-  String checkProperty(DartType type, String name) => _overrides.checkProperty(this, type, name);
+  String checkProperty( type, String name) => _overrides.checkProperty(this, type, name);
 
   TSImport getSdkPath(String _name, {LibraryElement lib, List<String> names, String modulePath}) {
     String name = _name.substring(5);
@@ -250,7 +250,7 @@ class TypeManager {
 
   static String _name(Element e) => (e is PropertyAccessorElement) ? e.variable.name : e.name;
 
-  String toTsName(Element element, {bool nopath: false}) {
+  String toTsName( element, {bool nopath: false}) {
     if (element == null) {
       return null;
     }

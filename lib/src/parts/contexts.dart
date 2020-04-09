@@ -608,7 +608,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
         return _mayWrapInAssignament(node, new TSDotExpression(tgt, name));
       }
     } else if (node is MethodElement) {
-      MethodElement el = node;
+      var el = node;
 
       bool hasTarget = false;
       TSExpression tgt;
@@ -621,14 +621,14 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
       }
 
       if (_context.currentClass != null && findMethod(currentClassType, node.name) != null && !hasTarget) {
-        if (el.isStatic) {
+        if ( isStatic(el.thisOrAncestorOfType())) {
           tgt = new TSTypeExpr.noTypeParams(_context.typeManager.toTsType(currentClassType));
         } else {
           tgt = TSSimpleExpression.THIS;
         }
 
         TSExpression expr = _context.typeManager.checkMethod(
-            el.enclosingElement.type, node.name, TSSimpleExpression.THIS,
+            el.thisOrAncestorOfType(), node.name, TSSimpleExpression.THIS,
             orElse: () => new TSDotExpression(tgt, node.name));
 
         // When using a method without invoking it => bind it to this
@@ -739,7 +739,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
 
       String name = identifier.name;
 
-      name = _context.typeManager.checkProperty((identifier.enclosingElement as ClassElement).type, name);
+      name = _context.typeManager.checkProperty(identifier, name);
 
       // Handler method name ref
       if (identifier is MethodElement) {
@@ -768,7 +768,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
   @override
   TSExpression visitStringInterpolation(StringInterpolation node) {
     InterpolationElementVisitor visitor = new InterpolationElementVisitor(_context);
-    return new TSStringInterpolation(new List.from(node.declaredElements.map((m) => m.accept(visitor))));
+    return new TSStringInterpolation(new List.from(node.elements.map((m) => m.accept(visitor))));
   }
 
   @override
@@ -897,9 +897,9 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
      * If we know the constructor just callit
      * otherwise use the helper function
      */
-    ArgumentListCollector collector = new ArgumentListCollector(_context, node.methodName);
+    ArgumentListCollector collector = new ArgumentListCollector(_context, node);
     node.argumentList.accept(collector);
-    Element elem = node.methodName;
+    var elem = node.methodName;
 
     bool safeAccess = node.operator?.type == TokenType.QUESTION_PERIOD;
     TSExpression safeTarget = safeAccess ? _newSafeTarget() : null;
@@ -1003,7 +1003,7 @@ class ArgumentListCollector extends GeneralizingAstVisitor {
   Iterable<ParameterElement> _parameters;
   ParameterElement _currentParam;
 
-  ArgumentListCollector(this._context, Element meth) {
+  ArgumentListCollector(this._context,  meth) {
     if (meth is ExecutableElement) {
       _parameters = meth.parameters;
     } else if (meth is VariableElement) {
@@ -1191,7 +1191,7 @@ class LibraryContext extends TopLevelContext<TSLibrary> {
     if (_libraryElement == e?.library) {
       if (e is ClassElement) {
         // calc parent order and add one
-        elementOrder[e] = calcElementOrder(e.supertype.declaredElement) + 1;
+        elementOrder[e] = calcElementOrder(e.supertype.element) + 1;
       }
     }
 
@@ -1209,7 +1209,7 @@ class LibraryContext extends TopLevelContext<TSLibrary> {
     tsLibrary = new TSLibrary(_libraryElement.source.uri.toString(),
         order: (n1, n2) => calcElementOrder(translated[n1]).compareTo(calcElementOrder(translated[n2])));
 
-    _libraryElement.units.forEach((cu) => new FileContext(this, cu.computeNode()).translate());
+    _libraryElement.units.forEach((cu) => new FileContext(this,cu).translate());
 
     tsLibrary.imports = new List.from(typeManager.allImports)
       ..insert(
@@ -1265,7 +1265,7 @@ class LibraryContext extends TopLevelContext<TSLibrary> {
 }
 
 class FileContext extends ChildContext<TSLibrary, LibraryContext, TSFile> {
-  CompilationUnit _compilationUnit;
+  CompilationUnitElement _compilationUnit;
   List<Context> _topLevelContexts;
   List<TSNode> globals;
 
@@ -1280,7 +1280,8 @@ class FileContext extends ChildContext<TSLibrary, LibraryContext, TSFile> {
 
     TopLevelDeclarationVisitor visitor = new TopLevelDeclarationVisitor(this);
     _topLevelContexts = new List();
-    _topLevelContexts.addAll(_compilationUnit.declarations.map((f) => f.accept(visitor)).where((x) => x != null));
+    _compilationUnit.visitChildren(visitor);
+    //_topLevelContexts.addAll();//.map();
 
     _topLevelContexts.forEach((c) => c.translate());
 
@@ -1299,7 +1300,7 @@ class FileContext extends ChildContext<TSLibrary, LibraryContext, TSFile> {
   void addOnModuleLoad(TSStatement statement) => parentContext.addOnModuleLoad(statement);
 }
 
-class TopLevelDeclarationVisitor extends GeneralizingAstVisitor<Context> {
+class TopLevelDeclarationVisitor extends GeneralizingAstVisitor<Context> implements ElementVisitor {
   FileContext _fileContext;
 
   TopLevelDeclarationVisitor(this._fileContext);
@@ -1347,6 +1348,8 @@ class TopLevelDeclarationVisitor extends GeneralizingAstVisitor<Context> {
   Context visitTopLevelVariableDeclaration(TopLevelVariableDeclaration node) {
     return new TopLevelVariableContext(_fileContext, node);
   }
+
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class EnumContext extends ChildContext<TSFile, FileContext, TSEnumDeclaration> {
@@ -1596,7 +1599,7 @@ TSAnnotation Function(Annotation anno) annotationMapper(
     } else {
       name = "${anno.name.name}.${name}";
     }
-    return annoFactory(anno.name.source.uri, name, collector.arguments, collector.namedArguments);
+    return annoFactory(anno.elementAnnotation.source.uri, name, collector.arguments, collector.namedArguments);
   };
 }
 
