@@ -9,6 +9,7 @@ import 'package:dart2ts/src/utils.dart';
 import  '../code_generator.dart';
 import  './ts_simple_ast.dart';
 import  './overrides.dart';
+import 'dart:async';
 //const String SDK_LIBRARY = '@dart2ts/dart';
 const String MODULE_PROPERTIES = 'properties';
 
@@ -99,7 +100,7 @@ class TypeManager {
 
   String namespace(LibraryElement lib) => namespaceFor(lib: lib);
 
-  TSExpression checkMethod(DartType type, String methodName, TSExpression tsTarget, {TSExpression orElse()}) =>
+  Future<TSExpression> checkMethod(DartType type, String methodName, TSExpression tsTarget, {TSExpression orElse()}) =>
       _overrides.checkMethod(this, type, methodName, tsTarget, orElse: orElse);
 
   String checkProperty( type, String name) => _overrides.checkProperty(this, type, name);
@@ -303,7 +304,7 @@ class TypeManager {
 
   static bool isTopLevel(Element e) => e.library.units.contains(e.enclosingElement);
 
-  TSType toTsType(DartType type, {bool noTypeArgs: false, bool inTypeOf: false}) {
+   toTsType(DartType type, {bool noTypeArgs: false, bool inTypeOf: false}) {
     if (type == null) {
       return null;
     }

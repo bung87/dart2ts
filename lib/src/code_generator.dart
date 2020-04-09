@@ -17,7 +17,8 @@ import 'package:build/src/builder/build_step_impl.dart';
 import 'package:build/src/builder/build_step.dart';
 import 'parts/overrides.dart';
 import 'package:build_resolvers/build_resolvers.dart';
-
+import 'package:build_resolvers/src/resolver.dart';
+import 'package:glob/glob.dart';
 
 final _P.Context path = new _P.Context(style: _P.Style.posix, current: '/');
 
@@ -27,7 +28,7 @@ final _P.Context path = new _P.Context(style: _P.Style.posix, current: '/');
 
 Logger _logger = new Logger('dart2ts.lib.code_generator');
 
-class Dart2TsBuildCommand extends Command<bool> {
+class Dart2TsBuildCommand extends Command<void> {
   @override
   String get description => "Build a file";
 
@@ -45,13 +46,20 @@ class Dart2TsBuildCommand extends Command<bool> {
   }
 
   @override
-  run() {
+  run() async{
     PackageGraph graph = new PackageGraph.fromRoot(argResults['dir']);
-
+    var resourceManager = ResourceManager();
+      // var reader = StubAssetReader();
+    var reader =  new FileBasedAssetReader(graph);
+    var writer = new FileBasedAssetWriter(graph);
+    var primary = AssetId(graph.root.name,graph.root.path);
+    var buildStep = BuildStepImpl(primary, [], reader, writer, primary.package,
+          AnalyzerResolvers(), resourceManager);
+    var resolver = new PerActionResolver(buildStep.resolver,buildStep, await reader.findAssets(new Glob('lib/**.dart') ).toList()  );
     Overrides overrides;
     if (argResults['with-overrides'] != null) {
       YamlDocument doc = loadYamlDocument(new io.File(argResults['sdk-prefix']).readAsStringSync());
-      overrides = new Overrides(doc);
+      overrides = new Overrides(doc,resolver);
     } else {
       overrides = null;
     }
@@ -72,13 +80,7 @@ class Dart2TsBuildCommand extends Command<bool> {
       final watcher = PackageGraphWatcher(graph);
       watcher.watch(); //actions, packageGraph: graph, onLog: (_) {}, deleteFilesByDefault: true
     } else {
-      var resourceManager = ResourceManager();
-      // var reader = StubAssetReader();
-      var reader =  new FileBasedAssetReader(graph);
-      var writer = new FileBasedAssetWriter(graph);
-      var primary = AssetId(graph.root.name,graph.root.path);
-      var buildStep = BuildStepImpl(primary, [], reader, writer, primary.package,
-          AnalyzerResolvers(), resourceManager);
+     
       // build(actions, packageGraph: graph, onLog: (_) {}, deleteFilesByDefault: true);
       builder.build(buildStep);
     }
@@ -144,7 +146,7 @@ class Dart2TsBuilder extends _BaseBuilder {
     _logger.fine('Processing ${library.location} for ${destId}');
 
     IndentingPrinter printer = new IndentingPrinter();
-    Overrides overrides = await Overrides.forCurrentContext();
+    Overrides overrides = await Overrides.forCurrentContext(buildStep.resolver);
     if (_config.overrides != null) {
       overrides.merge(_config.overrides);
     }

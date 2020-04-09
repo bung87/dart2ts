@@ -1,17 +1,20 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:build/build.dart';
 import 'package:dart2ts/src/utils.dart';
-import 'package:resource/resource.dart';
+import 'package:resource/resource.dart' as res;
 import 'package:yaml/yaml.dart';
 import  './ts_simple_ast.dart';
 import  './type_manager.dart';
 import  './contexts.dart';
+import 'dart:async' ;
 
 abstract class IOverrides {
+  // Resolver _resolver;
   IOverrides();
 
-  factory IOverrides.parse(String overrideYaml) => new Overrides.parse(overrideYaml);
+  factory IOverrides.parse(String overrideYaml, Resolver _resolver) => new Overrides.parse(overrideYaml,_resolver);
 }
 
 Map<K, V> _recursiveMerge<K, V>(Map<K, V> map1, Map<K, V> map2) {
@@ -28,26 +31,26 @@ Map<K, V> _recursiveMerge<K, V>(Map<K, V> map1, Map<K, V> map2) {
 
 class Overrides extends IOverrides {
   Map _overrides;
-
+  Resolver _resolver;
   Map _libraryOverrides(String uri) => _overrides[uri] as Map;
 
-  Overrides(YamlDocument _yaml) {
+  Overrides(YamlDocument _yaml,this._resolver) {
     Map _d = (_yaml?.contents is Map) ? _yaml.contents : {};
     this._overrides = _d['overrides'] ?? {};
   }
 
-  factory Overrides.parse(String overrideYaml) {
-    return new Overrides(loadYamlDocument(overrideYaml));
+  factory Overrides.parse(String overrideYaml,resolver) {
+    return new Overrides(loadYamlDocument(overrideYaml),resolver);
   }
 
-  static Future<Overrides> forCurrentContext() async {
-    Resource resource = new Resource('package:dart2ts/src/overrides.yml');
+  static Future<Overrides> forCurrentContext(resolver) async {
+    res.Resource resource = new res.Resource('package:dart2ts/src/overrides.yml');
     String str = await resource.readAsString();
 
-    return new Overrides(loadYamlDocument(str));
+    return new Overrides(loadYamlDocument(str),resolver);
   }
 
-  String resolvePrefix(TypeManager m, String module, [String origPrefix = null]) {
+  Future<String> resolvePrefix(TypeManager m, String module, [String origPrefix = null]) async {
     if (module == 'global') {
       return "";
     } else if (module != null) {
@@ -57,7 +60,7 @@ class Overrides extends IOverrides {
         return m.namespaceFor(uri: module, modulePath: module.substring(4),isSdk: true);
       }
       if (module.startsWith('dart:') || module.startsWith('package:')) {
-        return m.namespace(getLibrary(currentContext, module));
+        return m.namespace( await this._resolver.libraryFor(AssetId.parse(module)));
       }
     } else {
       return origPrefix;
@@ -69,8 +72,8 @@ class Overrides extends IOverrides {
    * The target can be a method name or a square expression. Inside square expression one can use `${prefix}` to replace
    * with the current prefix for the destination module, in order to access static fields in the native class.
    */
-  TSExpression checkMethod(TypeManager typeManager, DartType type, String methodName, TSExpression tsTarget,
-      {TSExpression orElse()}) {
+  Future<TSExpression> checkMethod(TypeManager typeManager, DartType type, String methodName, TSExpression tsTarget,
+      {TSExpression orElse()}) async {
     var classOverrides = _findClassOverride(type);
 
     if (classOverrides == null) {
@@ -85,7 +88,7 @@ class Overrides extends IOverrides {
 
     String module = classOverrides['to']['from'];
 
-    String prefix = resolvePrefix(typeManager, module);
+    String prefix = await resolvePrefix(typeManager, module);
 
     // Square or dot ?
 
@@ -195,7 +198,7 @@ class Overrides extends IOverrides {
     }).firstWhere(notNull, orElse: () => null);
   }
 
-  TSType checkType(TypeManager typeManager, String origPrefix, DartType type, bool noTypeArgs, {TSType orElse()}) {
+  Future<TSType> checkType(TypeManager typeManager, String origPrefix, DartType type, bool noTypeArgs, {TSType orElse()}) async {
     var classOverrides = _findClassOverride(type, recursive: false);
 
     if (classOverrides == null || classOverrides['to'] == null || (classOverrides['to'] as Map)['class'] == null) {
@@ -204,7 +207,7 @@ class Overrides extends IOverrides {
 
     String module = classOverrides['to']['from'] ?? classOverrides['library']['from'];
 
-    String p = resolvePrefix(typeManager, module, origPrefix);
+    String p = await resolvePrefix(typeManager, module, origPrefix);
     if (p != null && p.isNotEmpty) {
       p = "${p}.";
     }
@@ -212,7 +215,8 @@ class Overrides extends IOverrides {
     String actualName = classOverrides['to']['class'];
 
     if (!noTypeArgs && type is ParameterizedType && type.typeArguments.isNotEmpty) {
-      return new TSGenericType("${p}${actualName}", type.typeArguments.map((t) => typeManager.toTsType(t)).toList());
+      var l = await Future.wait(type.typeArguments.map((t) async => await typeManager.toTsType(t)));
+      return new TSGenericType("${p}${actualName}",Iterable.castFrom(l));
     } else {
       return new TSSimpleType("${p}${actualName}", !TypeManager.isNativeType(type));
     }
