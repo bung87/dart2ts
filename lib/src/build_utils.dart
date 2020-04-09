@@ -51,7 +51,7 @@ Future<BuildResult> tsbuild(
     if (dir.existsSync()) dir.deleteSync(recursive: true);
   }
 
-  PackageGraph packageGraph = PackageGraph.fromRoot(PackageNode("", basePath));
+  
 
   Config cfg;
 
@@ -63,7 +63,7 @@ Future<BuildResult> tsbuild(
       cfg = new Config();
       break;
   }
-
+  PackageGraph packageGraph = PackageGraph.fromRoot(PackageNode(null, basePath, null, null, isRoot: true));
   var builder = new Dart2TsBuilder(cfg);
   var resourceManager = ResourceManager();
   // var reader = StubAssetReader();

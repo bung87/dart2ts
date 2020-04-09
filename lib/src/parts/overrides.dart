@@ -1,8 +1,12 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
+import 'package:dart2ts/src/utils.dart';
+import 'package:resource/resource.dart';
 import 'package:yaml/yaml.dart';
 import  './ts_simple_ast.dart';
+import  './type_manager.dart';
+import  './contexts.dart';
 
 abstract class IOverrides {
   IOverrides();
@@ -37,7 +41,7 @@ class Overrides extends IOverrides {
   }
 
   static Future<Overrides> forCurrentContext() async {
-    res.Resource resource = new res.Resource('package:dart2ts/src/overrides.yml');
+    Resource resource = new Resource('package:dart2ts/src/overrides.yml');
     String str = await resource.readAsString();
 
     return new Overrides(loadYamlDocument(str));
@@ -143,7 +147,7 @@ class Overrides extends IOverrides {
     }
     Uri fromUri = lib.source?.uri;
 
-    _logger.fine("Checking type for {${fromUri}}");
+    // _logger.fine("Checking type for {${fromUri}}");
     if (fromUri == null) {
       return null;
     }
@@ -170,7 +174,7 @@ class Overrides extends IOverrides {
       LibraryElement from = type?.element?.library;
       Uri fromUri = from?.source?.uri;
 
-      _logger.fine("Checking type for {${fromUri}}${type?.name}");
+      // _logger.fine("Checking type for {${fromUri}}${type?.name}");
       if (type == null || fromUri == null) {
         return null;
       }
@@ -216,7 +220,7 @@ class Overrides extends IOverrides {
 
   TSExpression checkIndexedOperator(
       Context<TSNode> context, Expression target, Expression index, TSExpression orElse()) {
-    var classOverrides = _findClassOverride(target?.bestType);
+    var classOverrides = _findClassOverride(target.thisOrAncestorOfType());
 
     if (classOverrides == null) return orElse();
 

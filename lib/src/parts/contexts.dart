@@ -1,7 +1,9 @@
 
+
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
+import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:dart2ts/src/utils.dart';
@@ -205,9 +207,9 @@ class StatementVisitor extends GeneralizingAstVisitor<TSStatement> {
   @override
   TSStatement visitForStatement(ForStatement node) {
     TSNode initExpr;
-    if (node.variables != null) {
+    if (node.childEntities != null) {
       initExpr = new TSVariableDeclarations(
-          new List.from(node.variables.variables.map((v) => new TSVariableDeclaration(v.name.name,
+          new List.from(node.childEntities.map((v) => new TSVariableDeclaration(v.name.name,
               _context.processExpression(v.initializer), _context.typeManager.toTsType(node.variables.type?.type)))),
           isField: false);
     } else {
@@ -370,7 +372,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
   TSExpression visitMapLiteral(MapLiteral node) {
     DartType dartMap = getType(currentContext, 'dart:core', 'Map');
 
-    dartMap = currentContext.typeSystem.instantiateType(dartMap, (node.bestType as ParameterizedType).typeArguments);
+    dartMap = currentContext.typeSystem.instantiateType(dartMap, (node.thisOrAncestorOfType() as ParameterizedType).typeArguments);
 
     return new TSInvoke(new TSStaticRef(_context.typeManager.toTsType(dartMap), 'literal'), [
       new TSList(node.entries.map((entry) {
@@ -388,16 +390,16 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
     DartType listElementType = node.typeArguments?.arguments?.first?.type;
     return new TSInvoke(
         new TSStaticRef(_context.typeManager.toTsType(getType(currentContext, 'dart:core', 'List')), 'literal'),
-        new List.from(node.elements.map((e) => _context.processExpression(e))))
+        new List.from(node.childEntities.map((e) => _context.processExpression(e))))
       ..typeParameters = listElementType != null ? [_context.typeManager.toTsType(listElementType)] : null
       ..asNew = true;
     //return new TSList(),
-    //   _context.typeManager.toTsType(node?.bestType));
+    //   _context.typeManager.toTsType(node?.thisOrAncestorOfType()));
   }
 
   @override
   TSExpression visitPrefixExpression(PrefixExpression node) {
-    if (TypeManager.isNativeType(node.operand.bestType) || !node.operator.isUserDefinableOperator) {
+    if (TypeManager.isNativeType(node.operand.thisOrAncestorOfType()) || !node.operator.isUserDefinableOperator) {
       return new TSPrefixOperandExpression(node.operator.lexeme, _context.processExpression(node.operand));
     }
     TSExpression base = _context.processExpression(node.operand);
@@ -413,17 +415,17 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
   /*TSExpression handlePrefixSuffixExpression(Expression operand, Token operator, OperatorType opType) {
     TSExpression expr = _context.processExpression(operand);
 
-    if (TypeManager.isNativeType(operand.bestType) || !operator.isUserDefinableOperator) {
+    if (TypeManager.isNativeType(operand.thisOrAncestorOfType()) || !operator.isUserDefinableOperator) {
       if (opType == OperatorType.PREFIX)
         return new TSPrefixOperandExpression(operator.lexeme, expr);
       else
         return new TSPostfixOperandExpression(operator.lexeme, expr);
     }
 
-    if (operand.bestType is InterfaceType && !TypeManager.isNativeType(operand.bestType)) {
-      InterfaceType cls = operand.bestType as InterfaceType;
+    if (operand.thisOrAncestorOfType() is InterfaceType && !TypeManager.isNativeType(operand.thisOrAncestorOfType())) {
+      InterfaceType cls = operand.thisOrAncestorOfType() as InterfaceType;
       MethodElement method = findMethod(cls, operator.lexeme);
-      assert(method != null, 'Operator ${operator.lexeme} can be used only if defined in ${operand.bestType.name}');
+      assert(method != null, 'Operator ${operator.lexeme} can be used only if defined in ${operand.thisOrAncestorOfType().name}');
       return new TSInvoke(new TSDotExpression(expr, _operatorName(method, operator, opType)), []);
     }
 
@@ -436,7 +438,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
 
   @override
   TSExpression visitPostfixExpression(PostfixExpression node) {
-    if (TypeManager.isNativeType(node.operand.bestType) ||
+    if (TypeManager.isNativeType(node.operand.thisOrAncestorOfType()) ||
         !node.operator.isUserDefinableOperator /*postfix op not user definable */) {
       return new TSPostfixOperandExpression(node.operator.lexeme, _context.processExpression(node.operand));
     }
@@ -456,8 +458,8 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
     TSExpression rightExpression = _context.processExpression(node.rightOperand);
 
     if (node.operator.type != TokenType.TILDE_SLASH &&
-        (node.operator.type != TokenType.STAR || node.leftOperand.bestType != currentContext.typeProvider.stringType) &&
-        (TypeManager.isNativeType(node.leftOperand.bestType) || !node.operator.isUserDefinableOperator)) {
+        (node.operator.type != TokenType.STAR || node.leftOperand.thisOrAncestorOfType() != currentContext.typeProvider.stringType) &&
+        (TypeManager.isNativeType(node.leftOperand.thisOrAncestorOfType()) || !node.operator.isUserDefinableOperator)) {
       String op;
       if (node.operator.type == TokenType.QUESTION_QUESTION) {
         return new TSBracketExpression(new TSBinaryExpression(leftExpression, '||', rightExpression));
@@ -468,8 +470,8 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
       return new TSBinaryExpression(leftExpression, op, rightExpression);
     }
 
-    if (node.leftOperand.bestType is InterfaceType && !TypeManager.isNativeType(node.leftOperand.bestType)) {
-      InterfaceType cls = node.leftOperand.bestType as InterfaceType;
+    if (node.leftOperand.thisOrAncestorOfType() is InterfaceType && !TypeManager.isNativeType(node.leftOperand.thisOrAncestorOfType())) {
+      InterfaceType cls = node.leftOperand.thisOrAncestorOfType() as InterfaceType;
       MethodElement method = findMethod(cls, node.operator.lexeme);
       assert(method != null, 'Operator ${node.operator} can be used only if defined in ${cls.name}');
 
@@ -514,7 +516,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
             parameters: [new TSParameter(name: '_')],
             body: body,
             isExpression: true,
-            returnType: _context.typeManager.toTsType(node.target.bestType))),
+            returnType: _context.typeManager.toTsType(node.target.thisOrAncestorOfType()))),
         [_context.processExpression(node.target)]);
   }
 
@@ -530,7 +532,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
 
   @override
   TSExpression visitFunctionExpressionInvocation(FunctionExpressionInvocation node) {
-    ArgumentListCollector collector = new ArgumentListCollector(_context, node.bestElement);
+    ArgumentListCollector collector = new ArgumentListCollector(_context, node);
     collector.processArgumentList(node.argumentList);
     TSExpression target = new TSBracketExpression(_context.processExpression(node.function));
 
@@ -558,10 +560,10 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
         tgt = node.target;
       }
       if (tgt != null) {
-        if ((tgt?.bestType is InterfaceType &&
-                ((tgt?.bestType as InterfaceType)?.interfaces?.any((i) => i.name == 'JSIndexable') ?? false)) ||
-            isListType(tgt?.bestType) ||
-            TypeManager.isNativeType(tgt?.bestType)) {
+        if ((tgt?.thisOrAncestorOfType() is InterfaceType &&
+                ((tgt?.thisOrAncestorOfType() as InterfaceType)?.interfaces?.any((i) => i.name == 'JSIndexable') ?? false)) ||
+            isListType(tgt?.thisOrAncestorOfType()) ||
+            TypeManager.isNativeType(tgt?.thisOrAncestorOfType())) {
           // Use normal operator
           return _mayWrapInAssignament(node, new TSIndexExpression(target, _context.processExpression(node.index)));
         }
@@ -585,11 +587,11 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
   TSExpression visitSimpleIdentifier(SimpleIdentifier node) {
     // Check for implicit this
 
-    String name = _context.typeManager.toTsName(node.bestElement) ?? node.name;
+    String name = _context.typeManager.toTsName(node) ?? node.name;
 
-    DartType currentClassType = _context.currentClass?._classDeclaration?.element?.type;
-    if (node.bestElement is PropertyAccessorElement) {
-      PropertyInducingElement el = (node.bestElement as PropertyAccessorElement).variable;
+    DartType currentClassType = _context.currentClass?._classDeclaration?.declaredElement?.type;
+    if (node is PropertyAccessorElement) {
+      PropertyInducingElement el = (node as PropertyAccessorElement).variable;
 
       if (el.enclosingElement is ClassElement) {
         name = _context.typeManager.checkProperty((el.enclosingElement as ClassElement).type, node.name);
@@ -605,8 +607,8 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
         }
         return _mayWrapInAssignament(node, new TSDotExpression(tgt, name));
       }
-    } else if (node.bestElement is MethodElement) {
-      MethodElement el = node.bestElement;
+    } else if (node is MethodElement) {
+      MethodElement el = node;
 
       bool hasTarget = false;
       TSExpression tgt;
@@ -641,15 +643,15 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
       if (!isAssigningLeftSide(node) && (node.parent is! MethodInvocation)) {
         return new TSInvoke(new TSDotExpression(new TSSimpleExpression(name), 'bind'), [tgt]);
       }
-    } else if (node.bestElement is ClassElement) {
+    } else if (node is ClassElement) {
       if (node.parent is MethodInvocation || node.parent is PropertyAccess || node.parent is PrefixedIdentifier) {
-        return new TSTypeExpr.noTypeParams(_context.typeManager.toTsType((node.bestElement as ClassElement).type));
+        return new TSTypeExpr.noTypeParams(_context.typeManager.toTsType((node as ClassElement).type));
       } else {
-        return new TSTypeExpr(_context.typeManager.toTsType((node.bestElement as ClassElement).type));
+        return new TSTypeExpr(_context.typeManager.toTsType((node as ClassElement).type));
       }
-    } else if (node.bestElement is ExecutableElement) {
+    } else if (node is ExecutableElement) {
       // need resolve prefix
-      name = _context.typeManager.toTsName(node.bestElement);
+      name = _context.typeManager.toTsName(node);
     }
 
     // Resolve names otherwisely ( <- I know this term doesn't exist, but I like it)
@@ -680,10 +682,10 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
     DartType targetType;
     if (node.isCascaded) {
       tsTarget = new TSSimpleExpression.cascadingTarget();
-      targetType = findCascadeExpression(node)?.bestType;
+      targetType = findCascadeExpression(node)?.thisOrAncestorOfType();
     } else {
       tsTarget = _context.processExpression(node.target);
-      targetType = node.target?.bestType;
+      targetType = node.target?.thisOrAncestorOfType();
     }
 
     bool safeAccess = node.operator.type == TokenType.QUESTION_PERIOD;
@@ -710,7 +712,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
       String prefixStr = _context.typeManager.namespaceForPrefix(prefix);
 
       // Handle references to top level external variables or getters and setters
-      if (node.identifier.bestElement is PropertyAccessorElement) {
+      if (node.identifier is PropertyAccessorElement) {
         prefixStr = "${prefixStr}.${MODULE_PROPERTIES}";
       }
 
@@ -718,7 +720,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
     }
 
     return asFieldAccess(
-        _maybeWrapNativeCall(node.prefix?.bestType, _context.processExpression(node.prefix)), node.identifier);
+        _maybeWrapNativeCall(node.prefix?.thisOrAncestorOfType(), _context.processExpression(node.prefix)), node.identifier);
   }
 
   TSExpression _mayWrapInAssignament(AstNode node, TSExpression expre) {
@@ -732,15 +734,15 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
 
   TSExpression asFieldAccess(TSExpression expression, SimpleIdentifier identifier, {bool safeAccess: false}) {
     // If it's actually a property
-    if (identifier.bestElement != null) {
+    if (identifier != null) {
       // Check if we can apply an override
 
       String name = identifier.name;
 
-      name = _context.typeManager.checkProperty((identifier.bestElement.enclosingElement as ClassElement).type, name);
+      name = _context.typeManager.checkProperty((identifier.enclosingElement as ClassElement).type, name);
 
       // Handler method name ref
-      if (identifier.bestElement is MethodElement) {
+      if (identifier is MethodElement) {
         return new TSInvoke(new TSDotExpression(new TSDotExpression(expression, name), 'bind'), [expression]);
       } else {
         return _mayWrapInAssignament(identifier.parent, new TSDotExpression(expression, name, safeAccess: safeAccess));
@@ -766,7 +768,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
   @override
   TSExpression visitStringInterpolation(StringInterpolation node) {
     InterpolationElementVisitor visitor = new InterpolationElementVisitor(_context);
-    return new TSStringInterpolation(new List.from(node.elements.map((m) => m.accept(visitor))));
+    return new TSStringInterpolation(new List.from(node.declaredElements.map((m) => m.accept(visitor))));
   }
 
   @override
@@ -781,8 +783,8 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
     if (elem != null) {
       return _newObjectWithConstructor(elem, node, collector);
     } else {
-      assert(node.bestType != null, 'We should know at least the type to call "new" here ?');
-      TSType myType = _context.typeManager.toTsType(node.bestType);
+      assert(node.thisOrAncestorOfType() != null, 'We should know at least the type to call "new" here ?');
+      TSType myType = _context.typeManager.toTsType(node.thisOrAncestorOfType());
 
       return new TSInvoke(
           new TSSimpleExpression('bare.createInstance'),
@@ -805,8 +807,8 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
 
   TSExpression _newObjectWithConstructor(
       ConstructorElement ctor, InstanceCreationExpression node, ArgumentListCollector collector) {
-    return _context.typeManager.checkConstructor(_context, node.bestType, ctor, collector, () {
-      TSType myType = _context.typeManager.toTsType(node.bestType);
+    return _context.typeManager.checkConstructor(_context, node.thisOrAncestorOfType(), ctor, collector, () {
+      TSType myType = _context.typeManager.toTsType(node.thisOrAncestorOfType());
       TSExpression target;
 
       // Check if it's an anonymous @JS constructor
@@ -876,7 +878,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
 
     // Handle special case for string interpolators
 
-    DartObject tsMeta = getAnnotation(node.methodName?.bestElement?.metadata, isTS);
+    DartObject tsMeta = getAnnotation(node.methodName??.metadata, isTS);
     bool interpolate = tsMeta?.getField('stringInterpolation')?.toBoolValue() ?? false;
     if (interpolate) {
       TSNode arg = node.argumentList.arguments.single.accept(this);
@@ -886,7 +888,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
       } else if (arg is TSStringLiteral) {
         stringInterpolation = new TSStringInterpolation([new TSSimpleExpression(arg.stringValue)]);
       }
-      stringInterpolation.tag = _context.typeManager.toTsName(node.methodName.bestElement);
+      stringInterpolation.tag = _context.typeManager.toTsName(node.methodName);
       return stringInterpolation;
     }
 
@@ -895,9 +897,9 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
      * If we know the constructor just callit
      * otherwise use the helper function
      */
-    ArgumentListCollector collector = new ArgumentListCollector(_context, node.methodName.bestElement);
+    ArgumentListCollector collector = new ArgumentListCollector(_context, node.methodName);
     node.argumentList.accept(collector);
-    Element elem = node.methodName.bestElement;
+    Element elem = node.methodName;
 
     bool safeAccess = node.operator?.type == TokenType.QUESTION_PERIOD;
     TSExpression safeTarget = safeAccess ? _newSafeTarget() : null;
@@ -909,13 +911,13 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
       if (node.isCascaded) {
         target = new TSSimpleExpression.cascadingTarget();
         Expression cascadeTarget = findCascadeTarget(node);
-        method = _context.typeManager.checkMethod(cascadeTarget.bestType, node.methodName.name, target,
+        method = _context.typeManager.checkMethod(cascadeTarget.thisOrAncestorOfType(), node.methodName.name, target,
             orElse: () => new TSDotExpression(
-                _maybeWrapNativeCall(cascadeTarget.bestType, safeAccess ? safeTarget : target,
+                _maybeWrapNativeCall(cascadeTarget.thisOrAncestorOfType(), safeAccess ? safeTarget : target,
                     isStatic: isStatic(elem)),
                 _context.typeManager.toTsName(elem)));
       } else if (!TypeManager.isTopLevel(elem) && (elem.enclosingElement is ClassElement)) {
-        DartType targetType = node.target?.bestType ?? (elem.enclosingElement as ClassElement).type;
+        DartType targetType = node.target?.thisOrAncestorOfType() ?? (elem.enclosingElement as ClassElement).type;
         target = _context.processExpression(node.target) ??
             ((elem as ExecutableElement).isStatic
                 ? new TSTypeExpr(_context.typeManager.toTsType(targetType))
@@ -927,7 +929,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
           TSExpression res = _context.processExpression(node.methodName);
           if (node.target != null) {
             res = new TSDotExpression.expr(
-                _maybeWrapNativeCall(node.target?.bestType, safeAccess ? safeTarget : target, isStatic: isStatic(elem)),
+                _maybeWrapNativeCall(node.target?.thisOrAncestorOfType(), safeAccess ? safeTarget : target, isStatic: isStatic(elem)),
                 res);
           }
           return res;
@@ -945,7 +947,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
         targetExpression = findCascadeExpression(node);
         target = new TSSimpleExpression.cascadingTarget();
       } else if (targetExpression != null &&
-          !(targetExpression is SimpleIdentifier && targetExpression.bestElement is PrefixElement)) {
+          !(targetExpression is SimpleIdentifier && targetExpression is PrefixElement)) {
         target = _context.processExpression(node.target);
       } else {
         target = new TSSimpleExpression('null /*topLevl*/');
@@ -954,7 +956,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
       TSExpression res = _context.processExpression(node.methodName);
       if (node.target != null) {
         res = new TSDotExpression.expr(
-            _maybeWrapNativeCall(targetExpression.bestType, safeAccess ? safeTarget : target), res);
+            _maybeWrapNativeCall(targetExpression.thisOrAncestorOfType(), safeAccess ? safeTarget : target), res);
       }
 
       //return new TSInvoke(method,)
@@ -1189,7 +1191,7 @@ class LibraryContext extends TopLevelContext<TSLibrary> {
     if (_libraryElement == e?.library) {
       if (e is ClassElement) {
         // calc parent order and add one
-        elementOrder[e] = calcElementOrder(e.supertype.element) + 1;
+        elementOrder[e] = calcElementOrder(e.supertype.declaredElement) + 1;
       }
     }
 
@@ -1304,8 +1306,8 @@ class TopLevelDeclarationVisitor extends GeneralizingAstVisitor<Context> {
 
   @override
   Context visitFunctionDeclaration(FunctionDeclaration node) {
-    if (getAnnotation(node.element.metadata, isJS) != null) {
-      if (shouldGenerate(node.element.metadata)) {
+    if (getAnnotation(node.declaredElement.metadata, isJS) != null) {
+      if (shouldGenerate(node.declaredElement.metadata)) {
         return new TopLevelFunctionContext.declare(_fileContext, node);
       }
       return null;
@@ -1322,13 +1324,13 @@ class TopLevelDeclarationVisitor extends GeneralizingAstVisitor<Context> {
 
   @override
   Context visitClassDeclaration(ClassDeclaration node) {
-    if (getAnnotation(node.element.metadata, isJS) != null) {
-      String export = getAnnotation(node.element.metadata, isTS)?.getField('export')?.toStringValue();
+    if (getAnnotation(node.declaredElement.metadata, isJS) != null) {
+      String export = getAnnotation(node.declaredElement.metadata, isTS)?.getField('export')?.toStringValue();
       if (export != null) {
         _fileContext.parentContext.addExport(_fileContext.typeManager.resolvePath(export));
       }
 
-      if (shouldGenerate(node.element.metadata)) {
+      if (shouldGenerate(node.declaredElement.metadata)) {
         return new ClassContext(_fileContext, node, true);
       }
       return null;
@@ -1360,7 +1362,7 @@ class EnumContext extends ChildContext<TSFile, FileContext, TSEnumDeclaration> {
     EnumDeclarationVisitor visitor = new EnumDeclarationVisitor(this);
     enumDeclaration.accept(visitor);
 
-    parentContext.addDeclaration(tsEnumDeclaration, enumDeclaration.element);
+    parentContext.addDeclaration(tsEnumDeclaration, enumDeclaration.declaredElement);
   }
 
   void addEnumConstant(String name) {
@@ -1388,11 +1390,11 @@ class TopLevelFunctionContext extends FunctionDeclarationContext {
 
   void translate() {
     super.translate();
-    (parentContext as FileContext).addDeclaration(tsFunction, _functionDeclaration.element);
+    (parentContext as FileContext).addDeclaration(tsFunction, _functionDeclaration.declaredElement);
 
-    if (hasAnnotation(_functionDeclaration.element.metadata, isOnModuleLoad)) {
+    if (hasAnnotation(_functionDeclaration.declaredElement.metadata, isOnModuleLoad)) {
       (parentContext as FileContext).addOnModuleLoad(new TSExpressionStatement(
-          new TSInvoke(new TSSimpleExpression(typeManager.toTsName(_functionDeclaration.element)), null)));
+          new TSInvoke(new TSSimpleExpression(typeManager.toTsName(_functionDeclaration.declaredElement)), null)));
     }
   }
 }
@@ -1413,7 +1415,7 @@ class TopLevelVariableContext extends ChildContext<TSFile, FileContext, TSVariab
       isField: true,
     );
 
-    parentContext.addDeclaration(tsVariableDeclarations, _vars.element);
+    parentContext.addDeclaration(tsVariableDeclarations, _vars.declaredElement);
   }
 }
 
@@ -1508,12 +1510,12 @@ class FormalParameterCollector extends GeneralizingAstVisitor {
     }
     if (node.kind == ParameterKind.NAMED) {
       namedType ??= new TSInterfaceType();
-      namedType.fields[node.identifier.name] = _context.typeManager.toTsType(node.element.type);
+      namedType.fields[node.identifier.name] = _context.typeManager.toTsType(node.declaredElement.type);
     } else {
       parameters.add(new TSParameter(
           name: node.identifier.name,
-          varargs: getAnnotation(node.element.metadata, isVarargs) != null,
-          type: _context.typeManager.toTsType(node.element.type),
+          varargs: getAnnotation(node.declaredElement.metadata, isVarargs) != null,
+          type: _context.typeManager.toTsType(node.declaredElement.type),
           optional: node.kind.isOptional));
     }
   }
@@ -1536,8 +1538,8 @@ class FunctionDeclarationContext extends ChildContext<TSNode, Context, TSFunctio
   void translate() {
     String name = _functionDeclaration.name.name;
 
-    if (_functionDeclaration.element is PropertyAccessorElement) {
-      name = (_functionDeclaration.element as PropertyAccessorElement).variable.name;
+    if (_functionDeclaration.declaredElement is PropertyAccessorElement) {
+      name = (_functionDeclaration.declaredElement as PropertyAccessorElement).variable.name;
     }
 
     tsFunction = processFunctionExpression(_functionDeclaration.functionExpression)
@@ -1547,7 +1549,7 @@ class FunctionDeclarationContext extends ChildContext<TSNode, Context, TSFunctio
       ..isGetter = _functionDeclaration.isGetter
       ..isSetter = _functionDeclaration.isSetter
       ..isInterpolator =
-          getAnnotation(_functionDeclaration.element.metadata, isTS)?.getField('stringInterpolation')?.toBoolValue() ??
+          getAnnotation(_functionDeclaration.declaredElement.metadata, isTS)?.getField('stringInterpolation')?.toBoolValue() ??
               false
       ..returnType = parentContext.typeManager.toTsType(_functionDeclaration?.returnType?.type);
   }
@@ -1560,15 +1562,15 @@ TSAnnotation Function(Annotation anno) annotationMapper(
         annoFactory) {
   return (Annotation anno) {
     // Ignore unknown anno
-    if (anno.constructorName?.bestElement == null && anno.name.bestElement == null) {
+    if (anno.constructorName == null && anno.name == null) {
       return null;
     }
 
     ArgumentListCollector collector;
     String name;
-    if (anno.name.bestElement is PropertyAccessorElement) {
+    if (anno.name is PropertyAccessorElement) {
       ConstVariableElement constVar =
-          ((anno.name.bestElement as PropertyAccessorElement).variable) as ConstVariableElement;
+          ((anno.name as PropertyAccessorElement).variable) as ConstVariableElement;
 
       InstanceCreationExpression creationExpression = (constVar.computeNode() as VariableDeclaration).initializer;
 
@@ -1581,8 +1583,8 @@ TSAnnotation Function(Annotation anno) annotationMapper(
       //ArgumentListCollector collector = new ArgumentListCollector(context, cons);
       //collector.processArgumentList(inv.arguments);
     } else {
-      ConstructorElement cons = anno.constructorName?.bestElement ??
-          (anno.name.bestElement as ClassElement).constructors.firstWhere((e) => e.name == null || e.name.isEmpty);
+      ConstructorElement cons = anno.constructorName??
+          (anno.name as ClassElement).constructors.firstWhere((e) => e.name == null || e.name.isEmpty);
 
       collector = new ArgumentListCollector(context, cons);
       if (anno.arguments != null) collector.processArgumentList(anno.arguments);
@@ -1590,11 +1592,11 @@ TSAnnotation Function(Annotation anno) annotationMapper(
     }
 
     if (name == null || name.isEmpty) {
-      name = anno.name.bestElement.name;
+      name = anno.name.name;
     } else {
-      name = "${anno.name.bestElement.name}.${name}";
+      name = "${anno.name.name}.${name}";
     }
-    return annoFactory(anno.name.bestElement.library.source.uri, name, collector.arguments, collector.namedArguments);
+    return annoFactory(anno.name.source.uri, name, collector.arguments, collector.namedArguments);
   };
 }
 
@@ -1615,12 +1617,12 @@ class ClassContext extends ChildContext<TSFile, FileContext, TSClass> {
 
   @override
   void translate() {
-    _tsClass = new TSClass(library: _classDeclaration.element.librarySource.uri.toString());
+    _tsClass = new TSClass(library: _classDeclaration.declaredElement.librarySource.uri.toString());
     _tsClass.isAbstract = _classDeclaration.isAbstract;
 
     // Check if parent is native
-    if (_classDeclaration.element.supertype == currentContext.typeProvider.objectType ||
-        hasAnnotation(_classDeclaration.element.supertype.element.metadata, isJS)) {
+    if (_classDeclaration.declaredElement.supertype == currentContext.typeProvider.objectType ||
+        hasAnnotation(_classDeclaration.declaredElement.supertype.declaredElement.metadata, isJS)) {
       _tsClass.isParentNative = true;
     } else {
       _tsClass.isParentNative = false;
@@ -1661,12 +1663,12 @@ class ClassContext extends ChildContext<TSFile, FileContext, TSClass> {
         }
         intf.methods.forEach((me) {
           MethodElement lookedUp =
-              _classDeclaration.element.methods.firstWhere((m) => m.name == me.name, orElse: () => null);
+              _classDeclaration.declaredElement.methods.firstWhere((m) => m.name == me.name, orElse: () => null);
           if (lookedUp == null) {
             // Add the missing abstract method
             FormalParameterCollector parameterCollector = new FormalParameterCollector(this);
-            (me.computeNode().parameters?.parameters ?? []).forEach((p) {
-              p.accept(parameterCollector);
+            (me.parameters ?? []).forEach((p) {
+              p.accept(parameterCollector as ElementVisitor);
             });
 
             _tsClass.members.add(new TSFunction(typeManager,
@@ -1706,7 +1708,7 @@ class ClassContext extends ChildContext<TSFile, FileContext, TSClass> {
           namedParameters: {},
           body: new TSBody(statements: [], withBrackets: false),
           callSuper: _classDeclaration.extendsClause !=
-              null /* (_classDeclaration.element.type).superclass != currentContext.typeProvider.objectType*/));
+              null /* (_classDeclaration.declaredElement.type).superclass != currentContext.typeProvider.objectType*/));
     }
 
     if (thisInitializers.isNotEmpty) {
@@ -1738,13 +1740,13 @@ class ClassContext extends ChildContext<TSFile, FileContext, TSClass> {
             asMethod: true,
             name: 'new',
             withParameterCollector: parameterCollector,
-            returnType: typeManager.toTsType(_classDeclaration.element.type),
+            returnType: typeManager.toTsType(_classDeclaration.declaredElement.type),
           )
         ]);
     });*/
 
     // If exported add as a normal declaration
-    String export = getAnnotation(_classDeclaration.element.metadata, isTS)?.getField('export')?.toStringValue();
+    String export = getAnnotation(_classDeclaration.declaredElement.metadata, isTS)?.getField('export')?.toStringValue();
     _tsClass.isNative = _declarationMode;
     if (_declarationMode && export == null) {
       //_tsClass.isNative = true;
@@ -1752,7 +1754,7 @@ class ClassContext extends ChildContext<TSFile, FileContext, TSClass> {
     } else {
       //_tsClass.isNative = true;
       _tsClass.declared = _declarationMode;
-      parentContext.addDeclaration(_tsClass, _classDeclaration.element);
+      parentContext.addDeclaration(_tsClass, _classDeclaration.declaredElement);
     }
   }
 
@@ -1766,7 +1768,7 @@ class ClassContext extends ChildContext<TSFile, FileContext, TSClass> {
         }
       }
 
-      libJS = getAnnotation(_classDeclaration.element.metadata, isJS);
+      libJS = getAnnotation(_classDeclaration.declaredElement.metadata, isJS);
       if (libJS != null) {
         String main = libJS.getField('name').toStringValue();
         if (main != null && main.isNotEmpty) {
@@ -1796,8 +1798,8 @@ class ClassMemberVisitor extends GeneralizingAstVisitor {
   }
 
   String variableName(VariableDeclaration v) {
-    if (hasAnnotation(v.element.metadata, isJS)) {
-      return getAnnotation(v.element.metadata, isJS).getField('name').toStringValue();
+    if (hasAnnotation(v.declaredElement.metadata, isJS)) {
+      return getAnnotation(v.declaredElement.metadata, isJS).getField('name').toStringValue();
     } else {
       return v.name.name;
     }
@@ -1847,11 +1849,11 @@ class ClassMemberVisitor extends GeneralizingAstVisitor {
 
       String actualName = constructorType == ConstructorType.NAMED_FACTORY
           ? "${node.name.name}"
-          : '${node.element.enclosingElement.name}';
+          : '${node.declaredElement.enclosingElement.name}';
 
       List<TSTypeParameter> typeParams;
-      if (node.element.enclosingElement.typeParameters != null) {
-        typeParams = node.element.enclosingElement.typeParameters
+      if (node.declaredElement.enclosingElement.typeParameters != null) {
+        typeParams = node.declaredElement.enclosingElement.typeParameters
             .map(
                 (tp) => new TSTypeParameter(tp.name, tp.bound != null ? _context.typeManager.toTsType(tp.bound) : null))
             .toList();
@@ -1865,7 +1867,7 @@ class ClassMemberVisitor extends GeneralizingAstVisitor {
         typeParams = null;
       }
 
-      TSType returnType = _context.typeManager.toTsType(node.element.enclosingElement.type);
+      TSType returnType = _context.typeManager.toTsType(node.declaredElement.enclosingElement.type);
 
       _context.tsClass.members.add(new TSFunction(
         _context.typeManager,
@@ -1874,7 +1876,7 @@ class ClassMemberVisitor extends GeneralizingAstVisitor {
         isStatic: true,
         withParameterCollector: collector,
         body: body,
-        callSuper: (_context._classDeclaration.element.type).superclass != currentContext.typeProvider.objectType,
+        callSuper: (_context._classDeclaration.declaredElement.type).superclass != currentContext.typeProvider.objectType,
         constructorType: constructorType,
         typeParameters: typeParams,
         initializers: initializers,
@@ -1913,8 +1915,8 @@ class ClassMemberVisitor extends GeneralizingAstVisitor {
           initializers: initializers,
           constructorType: ConstructorType.DEFAULT,
           asDefaultConstructor: true,
-          callSuper: (_context._classDeclaration.element.type).superclass != currentContext.typeProvider.objectType,
-          nativeSuper: getAnnotation(_context._classDeclaration.element.type.superclass.element.metadata, isJS) != null,
+          callSuper: (_context._classDeclaration.declaredElement.type).superclass != currentContext.typeProvider.objectType,
+          nativeSuper: getAnnotation(_context._classDeclaration.declaredElement.type.superclass.declaredElement.metadata, isJS) != null,
           withParameterCollector: collector,
           body: body,
           name: tsClass.name));
@@ -1967,8 +1969,8 @@ class ClassMemberVisitor extends GeneralizingAstVisitor {
     TSType ctorType;
     FormalParameterCollector parameterCollector = _context.collectParameters(node.parameters);
     List<TSTypeParameter> typeParams;
-    if (node.element.enclosingElement.typeParameters != null) {
-      typeParams = node.element.enclosingElement.typeParameters
+    if (node.declaredElement.enclosingElement.typeParameters != null) {
+      typeParams = node.declaredElement.enclosingElement.typeParameters
           .map((tp) => new TSTypeParameter(tp.name, tp.bound != null ? _context.typeManager.toTsType(tp.bound) : null))
           .toList();
 
@@ -1981,7 +1983,7 @@ class ClassMemberVisitor extends GeneralizingAstVisitor {
       typeParams = null;
     }
 
-    TSType returnType = _context.typeManager.toTsType(node.element.enclosingElement.type);
+    TSType returnType = _context.typeManager.toTsType(node.declaredElement.enclosingElement.type);
 
     ctorType = new TSFunctionType(returnType, parameterCollector.asFormalArguments, typeParams, true);
 
@@ -2049,7 +2051,7 @@ class InitializerCollector extends GeneralizingAstVisitor<TSStatement> {
     if (node.constructorName == null) {
       target = new TSSimpleExpression('this.${node.staticElement.enclosingElement.name}');
     } else {
-      if ((node.constructorName.bestElement as ConstructorElement).isFactory) {
+      if ((node.constructorName as ConstructorElement).isFactory) {
         target = new TSSimpleExpression('this.\$${node.constructorName.name}');
       } else {
         target = new TSSimpleExpression('this.${node.constructorName.name}');
@@ -2082,7 +2084,7 @@ class MethodContext extends ChildContext<TSClass, ClassContext, TSNode> {
     if (_declarationMode && (_methodDeclaration.isGetter || _methodDeclaration.isSetter)) {
       // Actually add a readonly or normal prop
 
-      PropertyAccessorElement prop = _methodDeclaration.element as PropertyAccessorElement;
+      PropertyAccessorElement prop = _methodDeclaration.declaredElement as PropertyAccessorElement;
 
       bool readonly = prop.variable.setter == null;
 

@@ -244,7 +244,7 @@ DartType getType(AnalysisContext ctx, String libraryUri, String typeName) =>
     getLibrary(ctx, libraryUri).getType(typeName).thisType;
 
 LibraryElement getLibrary(AnalysisContext ctx, String libraryUri) =>
-    ctx.sourceFactory.forUri(libraryUri);
+    ctx.sourceFactory.forUri(Uri.parse(libraryUri));
 
 LibraryElement dartCore(AnalysisContext ctx) => getLibrary(ctx, 'dart:core');
 

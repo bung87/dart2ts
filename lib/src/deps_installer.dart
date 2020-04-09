@@ -1,6 +1,7 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'package:analyzer/analyzer.dart';
 import 'package:args/command_runner.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path;
@@ -62,7 +63,8 @@ void _installAllDeps(String rootPath, String destPath) {
   }
 
   // Read packages file
-  Map<String, Uri> pkgs = packages.parse(packagesFile.readAsBytesSync(), path.toUri(rootPath));
+  var list = packagesFile.readAsLinesSync().toList().skipWhile( (x) => x.startsWith("#")).map( (x) => x.split(":") );
+  Map<String, Uri> pkgs = Map.fromIterable(list, key: (v) => v[0], value: (v) => v[1]);
 
   // Recursively collect all the NOT DEV DEPS
 
