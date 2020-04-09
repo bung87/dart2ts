@@ -1214,7 +1214,7 @@ class LibraryContext extends TopLevelContext<TSLibrary> {
     tsLibrary.imports = new List.from(typeManager.allImports)
       ..insert(
           0,
-          typeManager._getSdkPath('****:utils', names: [
+          typeManager.getSdkPath('****:utils', names: [
             'defaultConstructor',
             'namedConstructor',
             'namedFactory',
@@ -1237,7 +1237,7 @@ class LibraryContext extends TopLevelContext<TSLibrary> {
           ]))
       ..insert(
           0,
-          typeManager._getSdkPath('****:_common', names: [
+          typeManager.getSdkPath('****:_common', names: [
             'is',
             'isNot',
             'equals',
@@ -1285,7 +1285,7 @@ class FileContext extends ChildContext<TSLibrary, LibraryContext, TSFile> {
     _topLevelContexts.forEach((c) => c.translate());
 
     TSFile tsFile = new TSFile(_compilationUnit, _tsDeclarations);
-    parentContext.tsLibrary._children.add(tsFile);
+    parentContext.tsLibrary.addChild(tsFile);
   }
 
   void addDeclaration(TSNode n, Element e) {
@@ -1496,7 +1496,7 @@ class FormalParameterCollector extends GeneralizingAstVisitor {
     if (node.defaultValue == null) {
       return;
     }
-    if (node.kind == ParameterKind.NAMED) {
+    if (node.isNamed) {
       namedDefaults[node.identifier.name] = _context.processExpression(node.defaultValue);
     } else {
       defaults[node.identifier.name] = _context.processExpression(node.defaultValue);
@@ -1508,7 +1508,7 @@ class FormalParameterCollector extends GeneralizingAstVisitor {
     if (node is FieldFormalParameter) {
       fields.add(node.identifier.name);
     }
-    if (node.kind == ParameterKind.NAMED) {
+    if (node.isNamed) {
       namedType ??= new TSInterfaceType();
       namedType.fields[node.identifier.name] = _context.typeManager.toTsType(node.declaredElement.type);
     } else {
@@ -1516,7 +1516,7 @@ class FormalParameterCollector extends GeneralizingAstVisitor {
           name: node.identifier.name,
           varargs: getAnnotation(node.declaredElement.metadata, isVarargs) != null,
           type: _context.typeManager.toTsType(node.declaredElement.type),
-          optional: node.kind.isOptional));
+          optional: node.isOptional));
     }
   }
 }
@@ -1569,10 +1569,10 @@ TSAnnotation Function(Annotation anno) annotationMapper(
     ArgumentListCollector collector;
     String name;
     if (anno.name is PropertyAccessorElement) {
-      ConstVariableElement constVar =
-          ((anno.name as PropertyAccessorElement).variable) as ConstVariableElement;
+      var constVar =
+          ((anno.name as PropertyAccessorElement).variable);
 
-      InstanceCreationExpression creationExpression = (constVar.computeNode() as VariableDeclaration).initializer;
+      InstanceCreationExpression creationExpression = (constVar.constantValue as VariableDeclaration).initializer;
 
       ConstructorElement cons = creationExpression.staticElement;
 
@@ -1622,7 +1622,7 @@ class ClassContext extends ChildContext<TSFile, FileContext, TSClass> {
 
     // Check if parent is native
     if (_classDeclaration.declaredElement.supertype == currentContext.typeProvider.objectType ||
-        hasAnnotation(_classDeclaration.declaredElement.supertype.declaredElement.metadata, isJS)) {
+        hasAnnotation(_classDeclaration.declaredElement.supertype.element.metadata, isJS)) {
       _tsClass.isParentNative = true;
     } else {
       _tsClass.isParentNative = false;
@@ -1916,7 +1916,7 @@ class ClassMemberVisitor extends GeneralizingAstVisitor {
           constructorType: ConstructorType.DEFAULT,
           asDefaultConstructor: true,
           callSuper: (_context._classDeclaration.declaredElement.type).superclass != currentContext.typeProvider.objectType,
-          nativeSuper: getAnnotation(_context._classDeclaration.declaredElement.type.superclass.declaredElement.metadata, isJS) != null,
+          nativeSuper: getAnnotation(_context._classDeclaration.declaredElement.type.superclass.element.metadata, isJS) != null,
           withParameterCollector: collector,
           body: body,
           name: tsClass.name));

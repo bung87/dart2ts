@@ -104,7 +104,7 @@ class TypeManager {
 
   String checkProperty(DartType type, String name) => _overrides.checkProperty(this, type, name);
 
-  TSImport _getSdkPath(String _name, {LibraryElement lib, List<String> names, String modulePath}) {
+  TSImport getSdkPath(String _name, {LibraryElement lib, List<String> names, String modulePath}) {
     String name = _name.substring(5);
 
     String p =  "${name}";
@@ -156,7 +156,7 @@ class TypeManager {
       if (lib.isInSdk) {
         // Replace with ts_sdk
 
-        return _getSdkPath(lib.name, lib: lib, modulePath: overridePath);
+        return getSdkPath(lib.name, lib: lib, modulePath: overridePath);
       }
 
       // If same package produce a relative path

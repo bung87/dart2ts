@@ -14,7 +14,7 @@ bool isTypeInstanceOf(ParameterizedType base, DartType type) =>
     type != null &&
     (type is ParameterizedType) &&
     type.typeArguments.length == 1 &&
-    type.isSubtypeOf(base.instantiate([type.typeArguments.single]));
+    type.isSubtypeOf(base.element as ClassElement).instantiate([type.typeArguments.single]);
 
 final Uri _DART2TS_URI = Uri.parse('package:dart2ts/annotations.dart');
 final Uri _DART2TS_ASSET_URI = Uri.parse('asset:dart2ts/lib/annotations.dart');
@@ -199,7 +199,7 @@ matcher anyOf(List<matcher> matches) => (DartObject o) => matches.any((m) => m(o
 bool notNull(x) => x != null;
 
 bool needsProcessing(LibraryElement le) => hasAnyFirstLevelAnnotation(
-    le.units.map((u) => u.unit),
+    le.units.map((u) => u.thisOrAncestorOfType()),
     anyOf([
       isJsMap,
       isBowerImport,
@@ -239,14 +239,6 @@ String tsMethodName(String name) {
 }
 
 bool isAnonymousConstructor(ConstructorElement c) => (c.name ?? "").isEmpty && !c.isFactory;
-
-DartType getType(AnalysisContext ctx, String libraryUri, String typeName) =>
-    getLibrary(ctx, libraryUri).getType(typeName).thisType;
-
-LibraryElement getLibrary(AnalysisContext ctx, String libraryUri) =>
-    ctx.sourceFactory.forUri(Uri.parse(libraryUri));
-
-LibraryElement dartCore(AnalysisContext ctx) => getLibrary(ctx, 'dart:core');
 
 // This doesn't work with analizer for me
 //typedef X X_FUNCTION();
