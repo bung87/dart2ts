@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:dart2ts/src/commands.dart' as cmd;
-import 'package:logging/logging.dart';
+// import 'package:logging/logging.dart';
 
 const String BOLD = '\x1b[1m';
 const String DIM = '\x1b[2m';

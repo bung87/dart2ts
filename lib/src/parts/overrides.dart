@@ -49,10 +49,10 @@ class Overrides extends IOverrides {
 
     return new Overrides(loadYamlDocument(str),resolver);
   }
-  Future<LibraryElement> getLibrary(String name) async {
-    return this._resolver.findLibraryByName(name);
-  }
-  Future<String> resolvePrefix(TypeManager m, String module, [String origPrefix = null]) async {
+  // LibraryElement getLibrary(String name)  {
+  //   return this._resolver.findLibraryByName(name);
+  // }
+  String resolvePrefix(TypeManager m, String module, [String origPrefix = null])  {
     if (module == 'global') {
       return "";
     } else if (module != null) {
@@ -62,7 +62,7 @@ class Overrides extends IOverrides {
         return m.namespaceFor(uri: module, modulePath: module.substring(4),isSdk: true);
       }
       if (module.startsWith('dart:') || module.startsWith('package:')) {
-        return m.namespace( await this._resolver.libraryFor(AssetId.parse(module)));
+        return m.namespaceFor(uri:module);
       }
     } else {
       return origPrefix;
@@ -74,8 +74,8 @@ class Overrides extends IOverrides {
    * The target can be a method name or a square expression. Inside square expression one can use `${prefix}` to replace
    * with the current prefix for the destination module, in order to access static fields in the native class.
    */
-  Future<TSExpression> checkMethod(TypeManager typeManager, DartType type, String methodName, TSExpression tsTarget,
-      {TSExpression orElse()}) async {
+  TSExpression checkMethod(TypeManager typeManager, DartType type, String methodName, TSExpression tsTarget,
+      {TSExpression orElse()})  {
     var classOverrides = _findClassOverride(type);
 
     if (classOverrides == null) {
@@ -90,7 +90,7 @@ class Overrides extends IOverrides {
 
     String module = classOverrides['to']['from'];
 
-    String prefix = await resolvePrefix(typeManager, module);
+    String prefix =  resolvePrefix(typeManager, module);
 
     // Square or dot ?
 

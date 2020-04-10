@@ -6,7 +6,7 @@ import 'package:dart2ts/src/code_generator.dart' show Dart2TsBuildCommand;
 
 Logger _logger = new Logger('dart2ts.lib.command');
 
-class Dart2TsCommandRunner extends CommandRunner<void> {
+class Dart2TsCommandRunner extends CommandRunner<bool> {
   Dart2TsCommandRunner() : super('dart2ts', 'a better interface to TS') {
     addCommand(new Dart2TsBuildCommand());
     addCommand(new Dart2TsInstallCommand());

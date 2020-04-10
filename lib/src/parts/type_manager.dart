@@ -17,10 +17,10 @@ const String MODULE_PROPERTIES = 'properties';
 class TSImport extends TSNode {
   String prefix;
   String path;
-  LibraryElement library;
+  // LibraryElement library;
   List<String> names;
 
-  TSImport({this.prefix, this.path, this.library, this.names}) {}
+  TSImport({this.prefix, this.path,this.names}) {}
 
   @override
   void writeCode(IndentingPrinter printer) {
@@ -99,18 +99,18 @@ class TypeManager {
     throw "Cannot convert to assetId : ${uri}";
   }
 
-  Future<LibraryElement> getLibrary(String name) async {
-    return this._overrides.getLibrary(name);
-  }
+  // Future<LibraryElement> getLibrary(String name) async {
+  //   return this._overrides.getLibrary(name);
+  // }
 
   String namespace(LibraryElement lib) => namespaceFor(lib: lib);
 
-  Future<TSExpression> checkMethod(DartType type, String methodName, TSExpression tsTarget, {TSExpression orElse()}) =>
+  TSExpression checkMethod(DartType type, String methodName, TSExpression tsTarget, {TSExpression orElse()}) =>
       _overrides.checkMethod(this, type, methodName, tsTarget, orElse: orElse);
 
   String checkProperty( type, String name) => _overrides.checkProperty(this, type, name);
 
-  TSImport getSdkPath(String _name, {LibraryElement lib, List<String> names, String modulePath}) {
+  TSImport getSdkPath(String _name, {List<String> names, String modulePath}) {
     String name = _name.substring(5);
 
     String p =  "${name}";
@@ -126,10 +126,10 @@ class TypeManager {
       }
     }
     if (names != null) {
-      return new TSImport(prefix: name, path:  modulePath ?? resolvePath(p, isSdk: true), library: lib, names: names);
+      return new TSImport(prefix: name, path:  modulePath ?? resolvePath(p, isSdk: true),  names: names);
     } else {
       return _importedPaths.putIfAbsent(p, () {
-        return new TSImport(prefix: name, path: modulePath ?? resolvePath(p, isSdk: true), library: lib);
+        return new TSImport(prefix: name, path: modulePath ?? resolvePath(p, isSdk: true));
       });
     }
   }
@@ -162,7 +162,7 @@ class TypeManager {
       if (lib.isInSdk) {
         // Replace with ts_sdk
 
-        return getSdkPath(lib.name, lib: lib, modulePath: overridePath);
+        return getSdkPath(lib.name, modulePath: overridePath);
       }
 
       // If same package produce a relative path
@@ -185,7 +185,7 @@ class TypeManager {
       // Extract package name and path and produce a nodemodule path
 
       return _importedPaths.putIfAbsent(
-          libPath, () => new TSImport(prefix: _nextPrefix(), path: resolvePath(libPath), library: lib));
+          libPath, () => new TSImport(prefix: _nextPrefix(), path: resolvePath(libPath)));
     }).prefix;
   }
 

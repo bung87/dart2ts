@@ -1,6 +1,9 @@
 
 
+import 'dart:async';
+
 import 'package:analyzer/dart/ast/ast.dart';
+import 'package:analyzer/dart/ast/syntactic_entity.dart';
 import 'package:analyzer/dart/ast/token.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/constant/value.dart';
@@ -11,6 +14,14 @@ import 'package:dart2ts/src/utils.dart';
 import './type_manager.dart';
 import  './ts_simple_ast.dart';
 import  './overrides.dart';
+
+Element getElement(SyntacticEntity entity) {
+  if (entity is SimpleIdentifier) {
+    return entity.staticElement;
+  }
+  return null;
+}
+
 
 abstract class Context<T extends TSNode> {
   TypeManager get typeManager;
@@ -204,32 +215,32 @@ class StatementVisitor extends GeneralizingAstVisitor<TSStatement> {
         _context.processExpression(node.condition), node.thenStatement.accept(this), node.elseStatement?.accept(this));
   }
 
-  @override
-  TSStatement visitForStatement(ForStatement node) {
-    TSNode initExpr;
-    if (node.childEntities != null) {
-      initExpr = new TSVariableDeclarations(
-          new List.from(node.childEntities.map((v) => new TSVariableDeclaration(v.name.name,
-              _context.processExpression(v.initializer), _context.typeManager.toTsType(node.variables.type?.type)))),
-          isField: false);
-    } else {
-      initExpr = null;
-    }
+  // @override
+  // TSStatement visitForStatement(ForStatement node) {
+  //   TSNode initExpr;
+  //   if (node.childEntities != null) {
+  //     var l1 = node.childEntities.map((v) => new TSVariableDeclaration(getElement(v).name, _context.processExpression(v)
+  //             ,_context.typeManager.toTsType(node.thisOrAncestorOfType())));
+  //     var l2 = new List.from(l1);
+  //     initExpr = new TSVariableDeclarations(Iterable.castFrom(l2),isField: false);
+  //   } else {
+  //     initExpr = null;
+  //   }
 
-    return new TSForStatement(
-        initExpr,
-        _context.processExpression(node.initialization),
-        _context.processExpression(node.condition),
-        node.updaters.map((e) => _context.processExpression(e)).toList(),
-        node.body.accept(this));
-  }
-
-  @override
-  TSStatement visitForEachStatement(ForEachStatement node) {
-    return new TSForEachStatement(toDeclaredIdentifier(node.loopVariable, loopVariable: true),
-        _context.processExpression(node.iterable), node.body.accept(this),
-        isAsync: node.awaitKeyword != null);
-  }
+  //   return new TSForStatement(
+  //       initExpr,
+  //       _context.processExpression(node.forLoopParts as Expression),
+  //       _context.processExpression(node.body as Expression),
+  //       node.updaters.map((e) => _context.processExpression(e)).toList(),
+  //       node.body.accept(this));
+  // }
+  // https://github.com/dart-lang/dart_style/pull/780
+  // @override
+  // TSStatement visitForEachStatement(ForEachStatement node) {
+  //   return new TSForEachStatement(toDeclaredIdentifier(node.loopVariable, loopVariable: true),
+  //       _context.processExpression(node.iterable), node.body.accept(this),
+  //       isAsync: node.awaitKeyword != null);
+  // }
 
   @override
   TSStatement visitWhileStatement(WhileStatement node) {
@@ -241,11 +252,11 @@ class StatementVisitor extends GeneralizingAstVisitor<TSStatement> {
     return new TSDoWhileStatement(_context.processExpression(node.condition), node.body.accept(this));
   }
 
-  @override
-  TSDeclaredIdentifier toDeclaredIdentifier(DeclaredIdentifier node, {bool loopVariable: false}) {
-    return new TSDeclaredIdentifier(
-        node.identifier.name, loopVariable ? null : _context.typeManager.toTsType(node.type.type));
-  }
+  // @override
+  // TSDeclaredIdentifier toDeclaredIdentifier(DeclaredIdentifier node, {bool loopVariable: false}) {
+  //   return new TSDeclaredIdentifier(
+  //       node.identifier.name, loopVariable ? null : _context.typeManager.toTsType(node.type.type));
+  // }
 
   @override
   TSStatement visitBlock(Block node) {
@@ -369,12 +380,12 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
   }
 
   @override
-  TSExpression visitMapLiteral(MapLiteral node) {
-    DartType dartMap = getType(currentContext, 'dart:core', 'Map');
-
-    dartMap = currentContext.typeSystem.instantiateType(dartMap, (node.thisOrAncestorOfType() as ParameterizedType).typeArguments);
-
-    return new TSInvoke(new TSStaticRef(_context.typeManager.toTsType(dartMap), 'literal'), [
+  TSExpression visitSetOrMapLiteral(dynamic node) {
+    // DartType dartMap = getType(currentContext, 'dart:core', 'Map');
+    // // (node as Element)
+    // dartMap = currentContext.typeSystem.instantiateType(dartMap, (node.thisOrAncestorOfType() as ParameterizedType).typeArguments);
+    
+    return new TSInvoke(new TSStaticRef(_context.typeManager.toTsType(node), 'literal'), [
       new TSList(node.entries.map((entry) {
         return new TSList([_context.processExpression(entry.key), _context.processExpression(entry.value)]);
       }).toList())
@@ -382,6 +393,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
     ])
       ..asNew = true;
   }
+  
 
   @override
   TSExpression visitListLiteral(ListLiteral node) {
@@ -389,7 +401,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
 
     DartType listElementType = node.typeArguments?.arguments?.first?.type;
     return new TSInvoke(
-        new TSStaticRef(_context.typeManager.toTsType(getType(currentContext, 'dart:core', 'List')), 'literal'),
+        new TSStaticRef(_context.typeManager.toTsType(node.thisOrAncestorOfType()), 'literal'),
         new List.from(node.childEntities.map((e) => _context.processExpression(e))))
       ..typeParameters = listElementType != null ? [_context.typeManager.toTsType(listElementType)] : null
       ..asNew = true;
@@ -584,7 +596,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
   }
 
   @override
-  TSExpression visitSimpleIdentifier(SimpleIdentifier node) {
+   visitSimpleIdentifier(SimpleIdentifier node)   {
     // Check for implicit this
 
     String name = _context.typeManager.toTsName(node) ?? node.name;
@@ -627,7 +639,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
           tgt = TSSimpleExpression.THIS;
         }
 
-        TSExpression expr = _context.typeManager.checkMethod(
+        TSExpression expr =  _context.typeManager.checkMethod(
             el.thisOrAncestorOfType(), node.name, TSSimpleExpression.THIS,
             orElse: () => new TSDotExpression(tgt, node.name));
 
@@ -878,7 +890,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
 
     // Handle special case for string interpolators
 
-    DartObject tsMeta = getAnnotation(node.methodName??.metadata, isTS);
+    DartObject tsMeta = getAnnotation(getElement(node.methodName).metadata, isTS);
     bool interpolate = tsMeta?.getField('stringInterpolation')?.toBoolValue() ?? false;
     if (interpolate) {
       TSNode arg = node.argumentList.arguments.single.accept(this);
@@ -914,10 +926,10 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
         method = _context.typeManager.checkMethod(cascadeTarget.thisOrAncestorOfType(), node.methodName.name, target,
             orElse: () => new TSDotExpression(
                 _maybeWrapNativeCall(cascadeTarget.thisOrAncestorOfType(), safeAccess ? safeTarget : target,
-                    isStatic: isStatic(elem)),
+                    isStatic: isStatic(getElement(elem))),
                 _context.typeManager.toTsName(elem)));
-      } else if (!TypeManager.isTopLevel(elem) && (elem.enclosingElement is ClassElement)) {
-        DartType targetType = node.target?.thisOrAncestorOfType() ?? (elem.enclosingElement as ClassElement).type;
+      } else if (!TypeManager.isTopLevel(getElement(elem) ) && (getElement(elem).enclosingElement is ClassElement)) {
+        DartType targetType = node.target?.thisOrAncestorOfType() ?? (getElement(elem).enclosingElement as ClassElement).thisOrAncestorOfType();
         target = _context.processExpression(node.target) ??
             ((elem as ExecutableElement).isStatic
                 ? new TSTypeExpr(_context.typeManager.toTsType(targetType))
@@ -929,7 +941,7 @@ class _ExpressionVisitor extends GeneralizingAstVisitor<TSExpression> {
           TSExpression res = _context.processExpression(node.methodName);
           if (node.target != null) {
             res = new TSDotExpression.expr(
-                _maybeWrapNativeCall(node.target?.thisOrAncestorOfType(), safeAccess ? safeTarget : target, isStatic: isStatic(elem)),
+                _maybeWrapNativeCall(node.target?.thisOrAncestorOfType(), safeAccess ? safeTarget : target, isStatic: isStatic(getElement(elem))),
                 res);
           }
           return res;
@@ -1080,9 +1092,9 @@ class InvokingContext<A extends TSNode, B extends Context<A>> extends ChildConte
 MethodElement findMethod(InterfaceType tp, String methodName) {
   MethodElement m = tp.getMethod(methodName);
   if (m != null) {
-    if (m is MethodMember) {
-      return m.baseElement;
-    }
+    // if (m is MethodMember) {
+    //   return m.baseElement;
+    // }
     return m;
   }
 
@@ -1108,9 +1120,9 @@ FieldElement findField(InterfaceType tp, String fieldName) {
   PropertyAccessorElement pe = tp.getGetter(fieldName) ?? tp.getSetter(fieldName);
   if (pe != null) {
     FieldElement m = pe.variable as FieldElement;
-    if (m is FieldMember) {
-      return m.baseElement;
-    }
+    // if (m is FieldMember) {
+    //   return m.baseElement;
+    // }
     return m;
   }
 

@@ -1,6 +1,15 @@
+import 'dart:io';
+
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
-import 'package:dart2ts/src/utils.dart';
+import 'package:analyzer/file_system/physical_file_system.dart';
+// import 'package:dart2ts/src/utils.dart';
+import 'package:analyzer/src/dart/sdk/sdk.dart';
+import 'package:analyzer/dart/element/element.dart';
+// import 'package:analyzer/src/dart/analysis/driver.dart' show AnalysisDriver;
+import 'package:analyzer/src/generated/engine.dart'
+    show  AnalysisOptionsImpl;
+
 
 import  '../code_generator.dart';
 import './type_manager.dart';
@@ -724,13 +733,16 @@ class TSFunction extends TSExpression implements TSStatement {
               new TSDotExpression(new TSSimpleExpression('this'), f), new TSSimpleExpression(f), "="))));
     }
   }
+  
 
-  asignPrefix() async { 
+  asignPrefix()  { 
+ 
+
     if (isGenerator) {
       if (isAsync) {
-        prefix = tm.namespace( await this.tm.getLibrary('dart:async'));
+        prefix = tm.namespaceFor(uri:'dart:async');
       } else {
-        prefix = tm.namespace(await this.tm.getLibrary( 'dart:core'));
+        prefix = tm.namespaceFor(uri:'dart:core'); 
       }
     }}
 
@@ -885,7 +897,7 @@ class TSFunction extends TSExpression implements TSStatement {
       }
 
       if (isAsync && !isGenerator) {
-        String async = tm.namespace( await this.tm.getLibrary( 'dart:async'));
+        String async = tm.namespaceFor(uri:'dart:async'); 
         writePrehamble(false);
         printer.write(' => new ${async}.Future.fromPromise(( async ');
       }
@@ -950,7 +962,7 @@ class TSFunction extends TSExpression implements TSStatement {
       printer.write(' => ');
     } else {
       if (isAsync) {
-        String async = tm.namespace(await this.tm.getLibrary( 'dart:async'));
+        String async = this.tm.namespaceFor(uri:'dart:async'); 
         if (isGenerator) {
           printer.writeln(' { ');
           printer.indent();

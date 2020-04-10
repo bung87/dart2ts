@@ -19,6 +19,10 @@ import 'parts/overrides.dart';
 import 'package:build_resolvers/build_resolvers.dart';
 import 'package:build_resolvers/src/resolver.dart';
 import 'package:glob/glob.dart';
+import 'package:build_resolvers/src/build_asset_uri_resolver.dart';
+import 'package:build_resolvers/src/analysis_driver.dart';
+import 'package:analyzer/src/generated/engine.dart'
+    show AnalysisOptionsImpl;
 
 final _P.Context path = new _P.Context(style: _P.Style.posix, current: '/');
 
@@ -28,7 +32,7 @@ final _P.Context path = new _P.Context(style: _P.Style.posix, current: '/');
 
 Logger _logger = new Logger('dart2ts.lib.code_generator');
 
-class Dart2TsBuildCommand extends Command<void> {
+class Dart2TsBuildCommand extends Command<bool> {
   @override
   String get description => "Build a file";
 
@@ -47,15 +51,21 @@ class Dart2TsBuildCommand extends Command<void> {
 
   @override
   run() async{
-    PackageGraph graph = new PackageGraph.fromRoot(argResults['dir']);
+    PackageGraph graph = new PackageGraph.fromRoot( new PackageNode("",argResults['dir'],DependencyType.path, null,isRoot:true));
     var resourceManager = ResourceManager();
       // var reader = StubAssetReader();
     var reader =  new FileBasedAssetReader(graph);
     var writer = new FileBasedAssetWriter(graph);
-    var primary = AssetId(graph.root.name,graph.root.path);
+    
+    var primary = AssetId(graph.root.name,"lib/dart_ast.dart");
     var buildStep = BuildStepImpl(primary, [], reader, writer, primary.package,
           AnalyzerResolvers(), resourceManager);
-    var resolver = new PerActionResolver(buildStep.resolver,buildStep, await reader.findAssets(new Glob('lib/**.dart') ).toList()  );
+    
+    var ur = new BuildAssetUriResolver();
+    var sdkSummaryPath = "";
+    var _driver = analysisDriver(ur,AnalysisOptionsImpl(),sdkSummaryPath);
+    var ar = new AnalyzerResolver(_driver,ur);
+    var resolver = new PerActionResolver(ar,buildStep, await reader.findAssets(new Glob('lib/**.dart') ).toList()  );
     Overrides overrides;
     if (argResults['with-overrides'] != null) {
       YamlDocument doc = loadYamlDocument(new io.File(argResults['sdk-prefix']).readAsStringSync());
